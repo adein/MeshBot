@@ -260,7 +260,7 @@ class MeshtasticService(BotService):
 
     def _on_receive_text_packet(self, packet, interface):
         # Called when a text packet arrives
-        #self.logger.info(f"Received text packet: {packet}")
+        self.logger.info(f"Received text packet: {packet}")
         if "decoded" not in packet or "text" not in packet["decoded"]:
             self.logger.warn(f"Unable to parse text packet: missing decoded or text fields")
             return
