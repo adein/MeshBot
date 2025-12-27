@@ -1,0 +1,46 @@
+core:
+  log_level: "INFO"
+  my_node_id: "!your_node_id"
+
+modules:
+  about:
+    enabled: true
+    interval_seconds: 0
+    contact_email: "public_contact_email@youremail.com"
+    contact_node_id: "!your_node_id_for_contact"
+  help:
+    enabled: true
+    interval_seconds: 0
+  local_nws_alerts:
+    enabled: true
+    interval_seconds: 1800
+    zone: "LOCAL_NWS_ZONE_ID"
+    channel: 0  # Channel = LongFast/local area
+  michmesh:
+    enabled: true
+    interval_seconds: 0
+  ping:
+    enabled: true
+    interval_seconds: 0
+  weather_alerts:
+    enabled: true
+    interval_seconds: 0
+    local_timezone: "America/Detroit"
+  weather_conditions:
+    enabled: true
+    interval_seconds: 0
+  weather_forecast:
+    enabled: true
+    interval_seconds: 0
+
+services:
+  meshtastic_service:
+    node_ip: "127.0.0.1"
+    node_port: 4403
+    reconnect_base_delay: 5
+    reconnect_max_delay: 300
+  nws_weather_service:
+    forecast_zone_type: "land"
+  positionstack_geocode_service:
+    api_key: "your_api_key"
+    country_limit: "US"

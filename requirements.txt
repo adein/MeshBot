@@ -1,0 +1,7 @@
+datetime
+meshtastic
+pubsub
+pyyaml
+requests
+schedule
+
