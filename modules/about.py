@@ -32,7 +32,7 @@ class About(BotModule):
                 contact_message = f"For any issues, requests, etc - Email me at {self.CONTACT_EMAIL}"
             else:
                 contact_message = contact_message + f" or by email at {self.CONTACT_EMAIL}"
-        if contact_message != NoneL
+        if contact_message != None:
             message_to_send = message_to_send + "\n" + contact_message
         self._send_message(message_to_send, data)
 
