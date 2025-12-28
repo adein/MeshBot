@@ -350,6 +350,9 @@ class MeshtasticService(BotService):
     def _on_receive_text_to_send(self, data):
         # Called when a text message to send has been received internally from the event bus
         self.logger.info(f"Received a text message to send with data: {data}")
+        if not self.connected:
+            self.logger.warn(f"Disconnected! Unable to send text message")
+            return
         text = data.text
         to_node_id = data.to_node_id
         to_channel_number = data.to_channel_number
