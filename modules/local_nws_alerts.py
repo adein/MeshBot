@@ -64,28 +64,32 @@ class NwsAlertChecker(BotModule):
             message_data = TextToSend(
                     summary_string + "\n" + description[:remaining_size],
                     None,
-                    self.channel
+                    self.channel,
+                    True
             )
             self.event_bus.publish("meshtastic_service.to_send", message_data)
         elif len(summary_string) + len(area_string) <= 199:
             message_data = TextToSend(
                     summary_string + "\n" + area_string,
                     None,
-                    self.channel
+                    self.channel,
+                    True
             )
             self.event_bus.publish("meshtastic_service.to_send", message_data)
         elif len(summary_string) <= 200:
             message_data = TextToSend(
                     summary_string,
                     None,
-                    self.channel
+                    self.channel,
+                    True
             )
             self.event_bus.publish("meshtastic_service.to_send", message_data)
         else:
             message_data = TextToSend(
                     summary_string[:200],
                     None,
-                    self.channel
+                    self.channel,
+                    True
             )
             self.event_bus.publish("meshtastic_service.to_send", message_data)
 
@@ -97,5 +101,3 @@ class NwsAlertChecker(BotModule):
         new_description = new_description.replace("* ADDITIONAL DETAILS...", "")
         new_description = new_description.replace("\n\n", "\n")
         return new_description
-
-
