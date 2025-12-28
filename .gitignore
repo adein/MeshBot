@@ -209,6 +209,7 @@ __marimo__/
 # MeshBot
 config.yaml
 *.log
+bot_activity.log*
 nodes.db
 nodes.db-shm
 nodes.db-wal

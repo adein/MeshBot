@@ -33,26 +33,26 @@ class Ping(BotModule):
                 sender = f"{node_data.long_name}"
             elif node_data.short_name != None:
                 sender = f"{node_data.short_name}"
-        message = f"@'{sender}' Pong!"
+        message = f"Pong @{sender}!"
         if via_mqtt == True:
             message = message + " Heard via MQTT."
         else:
             message = message + " Heard via LoRa radio."
-            if snr != None or (node_data != None and node_data.snr != None) or hops_away != None or (node_data != None and node_data.hops_away != None):
-                message = message + "\n"
-                spacer = ""
-                if snr != None:
-                    message = message + spacer + f"SNR: {snr}"
-                    spacer = ", "
-                elif node_data != None and node_data.snr != None:
-                    message = message + spacer + f"Previous SNR: {node_data.snr}"
-                    spacer = ", "
-                if hops_away != None:
-                    message = message + spacer + f"Hops away: {hops_away}"
-                    spacer = ", "
-                elif node_data != None and node_data.hops_away != None:
-                    message = message + spacer + f"Previous hops away: {node_data.hops_away}"
-                    spacer = ", "
+        if snr != None or (node_data != None and node_data.snr != None) or hops_away != None or (node_data != None and node_data.hops_away != None):
+            message = message + "\n"
+            spacer = ""
+            if snr != None:
+                message = message + spacer + f"SNR: {snr}"
+                spacer = ", "
+            elif node_data != None and node_data.snr != None:
+                message = message + spacer + f"Previously observed SNR: {node_data.snr}"
+                spacer = ", "
+            if hops_away != None:
+                message = message + spacer + f"Hops away: {hops_away}"
+                spacer = ", "
+            elif node_data != None and node_data.hops_away != None:
+                message = message + spacer + f"Previously observed hops away: {node_data.hops_away}"
+                spacer = ", "
         if from_id != None and to_id == self.my_node_id:
             message_data = TextToSend(
                     message,
