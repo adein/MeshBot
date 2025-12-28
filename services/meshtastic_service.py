@@ -1,4 +1,5 @@
 import dataclasses
+import hashlib
 import logging
 import time
 import threading
@@ -56,11 +57,14 @@ class MeshtasticService(BotService):
         self.running = False
         self.interface = None
         self.monitor_thread = None
+        self.seen_messages = {} # Format: {hash_string: timestamp}
+        self.dedup_lock = threading.Lock()
         self._db = NodeDatabase("./nodes.db")
         self.NODE_IP = self.config.get('node_ip', 4403)
         self.NODE_PORT = self.config.get('node_port', "0.0.0.0")
         self.RECONNECT_BASE_DELAY = self.config.get('reconnect_base_delay', 5)
         self.RECONNECT_MAX_DELAY = self.config.get('reconnect_max_delay', 300)
+        self.DEDUP_WINDOW = float(self.config.get('dedup_window', 5.0))
         self.logger.info(f"Node IP: {self.NODE_IP}")
         self.logger.info(f"Node Port: {self.NODE_PORT}")
         pub.subscribe(self._on_connected, "meshtastic.connection.established")
@@ -261,9 +265,24 @@ class MeshtasticService(BotService):
     def _on_receive_text_packet(self, packet, interface):
         # Called when a text packet arrives
         self.logger.info(f"Received text packet: {packet}")
-        if "decoded" not in packet or "text" not in packet["decoded"]:
-            self.logger.warn(f"Unable to parse text packet: missing decoded or text fields")
-            return
+        try:
+            payload = packet.get('decoded', {})
+            text = payload.get('text', '')
+            sender_id = packet.get('fromId', '')
+            if not text: 
+                self.logger.warn(f"Unable to parse text packet: missing decoded or text fields")
+                return
+            # Create a unique fingerprint for this message
+            # We combine sender and text
+            unique_str = f"{sender_id}:{text}"
+            msg_hash = hashlib.md5(unique_str.encode('utf-8')).hexdigest()
+            # Check for Duplicate
+            if self._is_duplicate(msg_hash):
+                self.logger.info(f"♻️ Ignored duplicate message from {sender_id}: '{text}'")
+                return
+            # Message is not a duplicate
+        except Exception as e:
+            self.logger.error(f"Error parsing packet: {e}")
         packet_id = None
         sender = None
         receiver = None
@@ -346,6 +365,31 @@ class MeshtasticService(BotService):
         self.logger.info(f"Saving Node info to DB: {current_info}")
         self._node_info_storage[node_id] = current_info
         self.event_bus.publish("meshtastic.text_message", text_packet)
+
+    def _is_duplicate(self, msg_hash):
+        """
+        Checks if the hash exists and is recent.
+        Also cleans up old cache entries to prevent memory leaks.
+        """
+        now = time.time()
+        with self.dedup_lock:
+            # Check if exists and is fresh
+            if msg_hash in self.seen_messages:
+                last_seen = self.seen_messages[msg_hash]
+                if now - last_seen < self.DEDUP_WINDOW:
+                    return True
+            # Not a duplicate. Add to cache.
+            self.seen_messages[msg_hash] = now
+            # Cleanup (only runs occasionally to save CPU)
+            if len(self.seen_messages) > 100:
+                self._prune_cache(now)
+            return False
+
+    def _prune_cache(self, now):
+        """Remove entries older than the window. MUST be called from within a lock."""
+        to_remove = [k for k, v in self.seen_messages.items() if now - v > self.DEDUP_WINDOW]
+        for k in to_remove:
+            del self.seen_messages[k]
 
     def _on_receive_text_to_send(self, data):
         # Called when a text message to send has been received internally from the event bus
@@ -451,4 +495,3 @@ class MeshtasticService(BotService):
         elif to_channel_number != None:
             return self.interface.sendText(text=text_to_send, channelIndex=to_channel_number)
         return None
-

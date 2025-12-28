@@ -1,6 +1,7 @@
 core:
   log_level: "INFO"
   my_node_id: "!your_node_id"
+  dedup_window: 10.0
 
 modules:
   about:
@@ -15,7 +16,7 @@ modules:
     enabled: true
     interval_seconds: 1800
     zone: "LOCAL_NWS_ZONE_ID"
-    channel: 0  # Channel = LongFast/local area
+    channel: 0 # Channel = LongFast/local area
   michmesh:
     enabled: true
     interval_seconds: 0
