@@ -38,10 +38,11 @@ class TextPacket:
 
 @dataclass
 class TextToSend:
-    __slots__ = ['text', 'to_node_id', 'to_channel_number']
+    __slots__ = ['text', 'to_node_id', 'to_channel_number', 'is_alert']
     text: str
     to_node_id: str
     to_channel_number: int
+    is_alert: bool
 
 class MeshtasticService(BotService):
     """
@@ -400,12 +401,21 @@ class MeshtasticService(BotService):
         text = data.text
         to_node_id = data.to_node_id
         to_channel_number = data.to_channel_number
-        if to_node_id != None:
-            self.send_text(text, to_node_id=to_node_id)
-        elif to_channel_number != None:
-            self.send_text(text, to_channel_number=to_channel_number)
+        is_alert = data.is_alert
+        if is_alert == True:
+            if to_node_id != None:
+                self.send_alert(text, to_node_id=to_node_id)
+            elif to_channel_number != None:
+                self.send_alert(text, to_channel_number=to_channel_number)
+            else:
+                self.logger.warn(f"Unable to send message - missing data!")
         else:
-            self.logger.warn(f"Unable to send message - missing data!")
+            if to_node_id != None:
+                self.send_text(text, to_node_id=to_node_id)
+            elif to_channel_number != None:
+                self.send_text(text, to_channel_number=to_channel_number)
+            else:
+                self.logger.warn(f"Unable to send message - missing data!")
 
     def _save_node_db(self):
         self.logger.info(f"Saving {len(self._node_info_storage)} to DB.")
@@ -494,4 +504,15 @@ class MeshtasticService(BotService):
             return self.interface.sendText(text=text_to_send, destinationId=to_node_id)
         elif to_channel_number != None:
             return self.interface.sendText(text=text_to_send, channelIndex=to_channel_number)
+        return None
+
+    def send_alert(self, text, to_node_id=None, to_channel_number=None):
+        self.logger.info(f"Send text alert: {text} to channel: {to_channel_number}, node:{to_node_id}")
+        if text == None or (to_node_id == None and to_channel_number == None):
+            return None
+        text_to_send = text[:200]
+        if to_node_id != None:
+            return self.interface.sendAlert(text=text_to_send, destinationId=to_node_id)
+        elif to_channel_number != None:
+            return self.interface.sendAlert(text=text_to_send, channelIndex=to_channel_number)
         return None

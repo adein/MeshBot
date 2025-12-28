@@ -99,7 +99,8 @@ class WeatherAlerts(BotModule):
             message_data = TextToSend(
                     message,
                     from_id,
-                    None
+                    None,
+                    False
             )
             self.logger.info(f"Alert command responding with payload: {message_data}")
             self.event_bus.publish("meshtastic_service.to_send", message_data)
@@ -107,7 +108,8 @@ class WeatherAlerts(BotModule):
             message_data = TextToSend(
                     message,
                     None,
-                    channel_num
+                    channel_num,
+                    False
             )
             self.logger.info(f"Alert command responding with payload: {message_data}")
             self.event_bus.publish("meshtastic_service.to_send", message_data)
