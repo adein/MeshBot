@@ -32,16 +32,20 @@ class NwsAlertChecker(BotModule):
         for alert_to_process in reversed_alerts:
             if alert_to_process.alert_id == None:
                 # Skip alerts without an ID
+                self.logger.warn(f"Skipping alert due to missing ID!")
                 continue
             elif now_utc > alert_to_process.expires:
                 # Skip expired alerts
+                self.logger.info(f"Skipping expired alert")
                 continue
             if alert_to_process.severity.lower() in ["minor", "unknown"]:
                 # Skip alerts not severe enough
+                self.logger.info(f"Skipping low or unknown severity alert")
                 continue
             elif alert_to_process.alert_id == self.previous_alert_id:
                 # Same alert as before and not expired
                 # Return early
+                self.logger.info(f"Skipping same alert as previous check")
                 return
             else:
                 # Process this alert
