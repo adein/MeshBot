@@ -3,6 +3,7 @@ import logging
 import yaml
 import sys
 from core.command_dispatcher import CommandDispatcher
+from core.database import Database
 from core.event_bus import EventBus
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
@@ -29,22 +30,30 @@ if __name__ == "__main__":
     )
     my_node_id = config['core'].get('my_node_id', 'ERROR')
 
-    # Initialize Core Components
+    # Initialize Global Components
     event_bus = EventBus()
-    meshtastic_service = MeshtasticService(event_bus, config.get('services', {}).get('meshtastic_service', {}))
+    db = Database(event_bus, config.get('core', {}).get('database', {}))
+    meshtastic_service = MeshtasticService(event_bus, db, config.get('services', {}).get('meshtastic_service', {}))
+    global_services = {
+        "bus": event_bus,
+        "db": db,
+        "mesh": meshtastic_service 
+    }
+    # Connect
+    db.connect()
+    meshtastic_service.connect()
+
+    # Initialize Core Components
     plugin_mgr = PluginManager(
         modules_dir="./modules",
         config=config,
-        event_bus=event_bus,
+        global_services=global_services,
         my_node=my_node_id,
-        mesh_svc=meshtastic_service
     )
     scheduler = BotScheduler(plugin_manager=plugin_mgr)
-    dispatcher = CommandDispatcher(event_bus, commands_dir="./commands", my_node=my_node_id)
+    dispatcher = CommandDispatcher(global_services, commands_dir="./commands", my_node=my_node_id)
     dispatcher.load_commands()
     dispatcher.start()
-
-    meshtastic_service.connect()
 
     # Load & Start
     plugin_mgr.discover_and_load()

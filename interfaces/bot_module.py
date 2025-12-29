@@ -5,12 +5,14 @@ class BotModule(ABC):
     """
     The contract that all modules must follow.
     """
-    def __init__(self, name, config, event_bus=None, my_node=None, mesh_svc=None):
+    def __init__(self, name, config, global_services, my_node=None):
         self.name = name
         self.config = config
-        self.event_bus = event_bus
+        self.services = global_services
         self.my_node_id = my_node
-        self.mesh_service = mesh_svc
+        self.db = self.services.get('db')
+        self.event_bus = self.services.get('bus')
+        self.mesh_service = self.services.get('mesh')
         self.logger = logging.getLogger(name)
 
     @abstractmethod

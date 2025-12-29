@@ -52,7 +52,7 @@ class BotScheduler:
         try:
             module.execute()
         except Exception as e:
-            self.logger.error(f"CRITICAL: Module '{module.name}' crashed: {e}")
+            self.logger.error(f"CRITICAL: Module '{module.name}' crashed: {e}", exc_info=True)
             # Optional: Disable module on crash?
             # module.config['enabled'] = False
 

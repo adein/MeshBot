@@ -1,20 +1,18 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from timezonefinder import TimezoneFinder
 from interfaces.bot_module import BotModule
 from services.meshtastic_service import TextToSend
 from services.positionstack_geocode_service import PositionstackGeocodeService
 from services.nws_weather_service import NwsWeatherService
 
 class WeatherAlerts(BotModule):
-    def __init__(self, name, config, event_bus=None, my_node=None, mesh_svc=None):
-        super().__init__(name, config, event_bus, my_node, mesh_svc)
+    def __init__(self, name, config, global_services, my_node=None):
+        super().__init__(name, config, global_services, my_node)
         # Initialize the geocode service
         self.geo_service = PositionstackGeocodeService()
         # Initialize the weather service
         self.api_service = NwsWeatherService()
-        # TODO: this needs to be changed to the TZ of the request location
-        self.LOCAL_TZ = self.config.get('local_timezone', "America/Detroit")
-        self.local_tz = ZoneInfo(self.LOCAL_TZ)
         # Listen to weather summary events
         if self.event_bus:
             self.event_bus.subscribe("bot.command.weather_alerts", self._handle_weather_request)
@@ -40,6 +38,12 @@ class WeatherAlerts(BotModule):
         if coords == None:
             self._send_message("Unable to identify the location for your query.", data)
             return
+        localzone = self._get_time_zone(coords.latitude, coords.longitude)
+        if localzone != None:
+            self.LOCAL_TZ = self.config.get('local_timezone', localzone)
+        else:
+            self.LOCAL_TZ = self.config.get('local_timezone', "America/Detroit")
+        self.local_tz = ZoneInfo(self.LOCAL_TZ)
         zone = self.api_service.get_zone(coords.latitude, coords.longitude)
         if zone == None:
             self._send_message("Unable to identify the location for your query.", data)
@@ -50,7 +54,8 @@ class WeatherAlerts(BotModule):
             return
         now_utc = datetime.now(timezone.utc)
         valid_alerts = []
-        for alert_to_process in alerts.reversed():
+        reversed_alerts = alerts[::-1]
+        for alert_to_process in reversed_alerts:
             if now_utc > alert_to_process.expires:
                 # Skip expired alerts
                 continue
@@ -71,7 +76,7 @@ class WeatherAlerts(BotModule):
             alert_prefix = "NWS Alert (" + alert.severity + "): "
             if len(alert_prefix) + len(alert.description) <= 200:
                 alert_summary = alert_prefix + alert.description
-            elif len(alert_prefix) + len(alert.headline) + 11 + expires_string <= 200:
+            elif len(alert_prefix) + len(alert.headline) + 11 + len(expires_string) <= 200:
                 alert_summary = alert_prefix + alert.headline + ". Expires: " + expires_string
             else:
                 alert_summary = alert_prefix + alert.headline
@@ -84,6 +89,11 @@ class WeatherAlerts(BotModule):
             self._send_message("Error processing NWS alerts for that location.", data)
             return
         self._send_message(alert_summary, data)
+
+    def _get_time_zone(self, latitude, longitude):
+        tf = TimezoneFinder()
+        time_zone = tf.timezone_at(lat=latitude, lng=longitude)
+        return time_zone
 
     def _process_alert(self, alert):
         expires_utc = alert.expires

@@ -6,8 +6,8 @@ from services.nws_weather_service import NwsWeatherService
 class NwsAlertChecker(BotModule):
     previous_alert_id = None
 
-    def __init__(self, name, config, event_bus=None, my_node=None, mesh_svc=None):
-        super().__init__(name, config, event_bus, my_node, mesh_svc)
+    def __init__(self, name, config, global_services, my_node=None):
+        super().__init__(name, config, global_services, my_node)
         # Initialize the service once when the module loads
         self.api_service = NwsWeatherService()
         self.channel = self.config.get('channel', "0")

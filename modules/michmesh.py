@@ -4,8 +4,8 @@ from services.meshtastic_service import TextToSend
 class MichMesh(BotModule):
     INFO = "MichMesh setup information: https://tinyurl.com/michmesh"
 
-    def __init__(self, name, config, event_bus=None, my_node=None, mesh_svc=None):
-        super().__init__(name, config, event_bus, my_node, mesh_svc)
+    def __init__(self, name, config, global_services, my_node=None):
+        super().__init__(name, config, global_services, my_node)
         # Listen for the command event
         if self.event_bus:
             self.event_bus.subscribe("bot.command.michmesh", self._handle_command)

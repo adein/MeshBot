@@ -2,18 +2,22 @@ from interfaces.bot_module import BotModule
 from services.meshtastic_service import TextToSend
 
 class Help(BotModule):
-    GENERAL_HELP = "Available commands: !about, !michmesh, !ping, !weather {location}, !forecast {location}, !alerts {location}"
+    GENERAL_HELP = "General commands: !about, !michmesh, !ping, !stats"
+    WEATHER_HELP = "Weather commands: !alerts {location}, !forecast {location}, !weather {location}"
     HELP_ERROR = 'Unknown command. Try "!help" or "!help command"'
 
-    ABOUT_HELP = 'Get information about this bot or how to get in contact with the owner'
-    ALERTS_HELP = 'Get NWS alerts for your area using zip or city,state. Example: !alerts detroit, mi'
-    FORECAST_HELP = 'Get NWS forecast for your area using zip or city,state. Example: !forecast detroit, mi'
-    MICHMESH_HELP = 'Get information about configuring your meshtastic node to talk with Michiganders'
-    PING_HELP = 'Test your connection and reception by requesting a response back. Example: !ping'
-    WEATHER_HELP = 'Get NWS current conditions from nearest weather station using zip or city,state. Example: !weather 12345'
+    ABOUT_CMD_HELP = 'Get information about this bot or how to get in contact with the owner'
+    MICHMESH_CMD_HELP = 'Get information about configuring your meshtastic node to talk with Michiganders'
+    PING_CMD_HELP = 'Test your connection and reception by requesting a response back. Example: !ping'
+    STATS_CMD_HELP = 'View stats about bot usage, channel activity, or user activity. Example !stats channels'
 
-    def __init__(self, name, config, event_bus=None, my_node=None, mesh_svc=None):
-        super().__init__(name, config, event_bus, my_node, mesh_svc)
+    ALERTS_CMD_HELP = 'Get NWS alerts for your area using zip or city,state. Example: !alerts detroit, mi'
+    FORECAST_CMD_HELP = 'Get NWS forecast for your area using zip or city,state. Example: !forecast detroit, mi'
+    WEATHER_CMD_HELP = 'Get NWS current conditions from nearest weather station using zip or city,state. Example: !weather 12345'
+
+    def __init__(self, name, config, global_services, my_node=None):
+        super().__init__(name, config, global_services, my_node)
+        self.ALL_HELP = self.GENERAL_HELP + "\n" + self.WEATHER_HELP
         # Listen for the command event
         if self.event_bus:
             self.event_bus.subscribe("bot.command.help", self._handle_command)
@@ -32,27 +36,30 @@ class Help(BotModule):
 
         arguments = data.parameters
         if arguments == None or len(arguments) <= 0:
-            self._send_message(self.GENERAL_HELP, data)
+            self._send_message(self.ALL_HELP, data)
             return
         elif len(arguments) == 1:
             help_subcommand = arguments[0].removeprefix('!')
             if help_subcommand == "about":
-                self._send_message(self.ABOUT_HELP, data)
-                return
-            elif help_subcommand == "alerts":
-                self._send_message(self.ALERTS_HELP, data)
-                return
-            elif help_subcommand == "forecast":
-                self._send_message(self.FORECAST_HELP, data)
+                self._send_message(self.ABOUT_CMD_HELP, data)
                 return
             elif help_subcommand == "michmesh":
-                self._send_message(self.MICHMESH_HELP, data)
+                self._send_message(self.MICHMESH_CMD_HELP, data)
                 return
             elif help_subcommand == "ping":
-                self._send_message(self.PING_HELP, data)
+                self._send_message(self.PING_CMD_HELP, data)
+                return
+            elif help_subcommand == "stats":
+                self._send_message(self.STATS_CMD_HELP, data)
+                return
+            elif help_subcommand == "alerts":
+                self._send_message(self.ALERTS_CMD_HELP, data)
+                return
+            elif help_subcommand == "forecast":
+                self._send_message(self.FORECAST_CMD_HELP, data)
                 return
             elif help_subcommand == "weather":
-                self._send_message(self.WEATHER_HELP, data)
+                self._send_message(self.WEATHER_CMD_HELP, data)
                 return
             else:
                 self._send_message(self.HELP_ERROR, data)
