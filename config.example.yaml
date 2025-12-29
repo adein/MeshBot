@@ -2,6 +2,8 @@ core:
   log_level: "INFO"
   my_node_id: "!your_node_id"
   dedup_window: 10.0
+  database:
+    db_path: "meshbot_data.db"
 
 modules:
   about:
@@ -21,6 +23,9 @@ modules:
     enabled: true
     interval_seconds: 0
   ping:
+    enabled: true
+    interval_seconds: 0
+  stats_reporter:
     enabled: true
     interval_seconds: 0
   weather_alerts:

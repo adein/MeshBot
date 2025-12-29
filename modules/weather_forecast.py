@@ -4,8 +4,8 @@ from services.positionstack_geocode_service import PositionstackGeocodeService
 from services.nws_weather_service import NwsWeatherService
 
 class WeatherForecast(BotModule):
-    def __init__(self, name, config, event_bus=None, my_node=None, mesh_svc=None):
-        super().__init__(name, config, event_bus, my_node, mesh_svc)
+    def __init__(self, name, config, global_services, my_node=None):
+        super().__init__(name, config, global_services, my_node)
         # Initialize the geocode service
         self.geo_service = PositionstackGeocodeService()
         # Initialize the weather service

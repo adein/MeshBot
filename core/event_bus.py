@@ -23,4 +23,4 @@ class EventBus:
                 try:
                     callback(data)
                 except Exception as e:
-                    self.logger.error(f"Error in event handler for {event_type}: {e}")
+                    self.logger.error(f"Error in event handler for {event_type}: {e}", exc_info=True)

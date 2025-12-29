@@ -210,6 +210,7 @@ __marimo__/
 config.yaml
 *.log
 bot_activity.log*
-nodes.db
-nodes.db-shm
-nodes.db-wal
+*.db
+*.db-shm
+*.db-wal
+

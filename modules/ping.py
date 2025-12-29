@@ -2,8 +2,8 @@ from interfaces.bot_module import BotModule
 from services.meshtastic_service import TextToSend
 
 class Ping(BotModule):
-    def __init__(self, name, config, event_bus=None, my_node=None, mesh_svc=None):
-        super().__init__(name, config, event_bus, my_node, mesh_svc)
+    def __init__(self, name, config, global_services, my_node=None):
+        super().__init__(name, config, global_services, my_node)
         # Listen for the command event
         if self.event_bus:
             self.event_bus.subscribe("bot.command.ping", self._handle_command)

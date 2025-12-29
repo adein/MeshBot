@@ -19,10 +19,11 @@ class CommandData:
     via_mqtt: bool
 
 class CommandDispatcher:
-    def __init__(self, event_bus, commands_dir="./commands", my_node=None):
-        self.event_bus = event_bus
+    def __init__(self, global_services, commands_dir="./commands", my_node=None):
+        self.services = global_services
         self.commands_dir = commands_dir
         self.my_node_id = my_node
+        self.event_bus = self.services.get('bus')
         self.registry = {} 
         self.logger = logging.getLogger("Core.CommandDispatcher")
 
@@ -66,7 +67,7 @@ class CommandDispatcher:
                     self.logger.info(f"Registered command '!{cmd_instance.trigger}' -> {cmd_instance.event_topic}")
 
         except Exception as e:
-            self.logger.error(f"Failed to load command file {filename}: {e}")
+            self.logger.error(f"Failed to load command file {filename}: {e}", exc_info=True)
 
     def start(self):
         self.event_bus.subscribe("meshtastic.text_message", self.handle_message)
@@ -84,9 +85,12 @@ class CommandDispatcher:
         
         if command:
             self.logger.info(f"Command recognized: !{trigger_word}")
+            sender_id = packet.sender_id
+            db = self.services.get('db')
+            if db:
+                db.log_command(trigger_word, sender_id)
             args_list = parts[1:] if len(parts) > 1 else None
 
-            sender_id = packet.sender_id
             receiver_id = packet.receiver_id
             parameters = args_list
             raw_message = text
@@ -111,4 +115,3 @@ class CommandDispatcher:
             self.event_bus.publish(command.event_topic, data)
         else:
             self.logger.info(f"Unknown command: !{trigger_word}")
-

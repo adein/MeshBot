@@ -4,12 +4,13 @@ import logging
 from interfaces.bot_module import BotModule
 
 class PluginManager:
-    def __init__(self, modules_dir, config, event_bus, my_node, mesh_svc):
+    def __init__(self, modules_dir, config, global_services, my_node):
         self.modules_dir = modules_dir
         self.config = config
-        self.event_bus = event_bus
+        self.services = global_services
         self.my_node_id = my_node
-        self.mesh_service = mesh_svc
+        self.event_bus = self.services.get('bus')
+        self.mesh_service = self.services.get('mesh')
         self.loaded_modules = {}
         self.logger = logging.getLogger("Core.PluginManager")
 
@@ -41,7 +42,7 @@ class PluginManager:
                 # Inspect module for BotModule subclasses
                 self._register_classes_from_module(py_mod, module_name)
         except Exception as e:
-            self.logger.error(f"Failed to load file {filename}: {e}")
+            self.logger.error(f"Failed to load file {filename}: {e}", exc_info=True)
 
     def _register_classes_from_module(self, py_mod, module_name_from_file):
         for attribute_name in dir(py_mod):
@@ -58,14 +59,13 @@ class PluginManager:
                     instance = attribute(
                         name=module_name_from_file,
                         config=mod_config,
-                        event_bus=self.event_bus,
+                        global_services=self.services,
                         my_node=self.my_node_id,
-                        mesh_svc=self.mesh_service
                     )
                     self.loaded_modules[module_name_from_file] = instance
                     self.logger.info(f"Successfully registered module: {module_name_from_file}")
                 except Exception as e:
-                    self.logger.error(f"Error instantiating {attribute_name}: {e}")
+                    self.logger.error(f"Error instantiating {attribute_name}: {e}", exc_info=True)
 
     def get_module(self, name):
         return self.loaded_modules.get(name)

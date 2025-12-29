@@ -4,7 +4,7 @@ import logging
 import time
 import threading
 import meshtastic
-import meshtastic.serial_interface
+#import meshtastic.serial_interface
 import meshtastic.tcp_interface
 
 from dataclasses import dataclass
@@ -12,12 +12,12 @@ from pathlib import Path
 from pubsub import pub
 
 from interfaces.bot_service import BotService
-from storage.node_database import NodeDatabase
-from storage.node_database import NodeInfo
+from core.database import Database
+from core.database import NodeInfo
 
 @dataclass
 class TextPacket:
-    __slots__ = ['packet_id', 'sender', 'receiver', 'sender_id', 'receiver_id', 'message', 'channel', 'rx_time', 'rx_snr', 'hop_limit', 'hop_start', 'next_hop', 'relay_node', 'want_ack', 'public_key', 'pki_encrypted', 'via_mqtt']
+    __slots__ = ['packet_id', 'sender', 'receiver', 'sender_id', 'receiver_id', 'message', 'channel', 'rx_time', 'rx_snr', 'hop_limit', 'hop_start', 'next_hop', 'relay_node', 'want_ack', 'public_key', 'pki_encrypted', 'via_mqtt', 'is_dm']
     packet_id: int
     sender: int
     receiver: int
@@ -35,6 +35,7 @@ class TextPacket:
     public_key: str
     pki_encrypted: bool
     via_mqtt: bool
+    is_dm: bool
 
 @dataclass
 class TextToSend:
@@ -51,8 +52,9 @@ class MeshtasticService(BotService):
 
     _node_info_storage = {}
 
-    def __init__(self, event_bus, config):
+    def __init__(self, event_bus, db, config):
         super().__init__(event_bus, config)
+        self.db = db
         self.logger = logging.getLogger("Service.Meshtastic")
         self.connected = False
         self.running = False
@@ -60,7 +62,6 @@ class MeshtasticService(BotService):
         self.monitor_thread = None
         self.seen_messages = {} # Format: {hash_string: timestamp}
         self.dedup_lock = threading.Lock()
-        self._db = NodeDatabase("./nodes.db")
         self.NODE_IP = self.config.get('node_ip', 4403)
         self.NODE_PORT = self.config.get('node_port', "0.0.0.0")
         self.RECONNECT_BASE_DELAY = self.config.get('reconnect_base_delay', 5)
@@ -80,7 +81,7 @@ class MeshtasticService(BotService):
         # Called when we (re)connect to the radio
         self.connected = True
         self.logger.info(f"Connected.")
-        nodes_from_db = self._db.load_nodes()
+        nodes_from_db = self.db.load_nodes()
         if nodes_from_db != None and len(nodes_from_db) > 0:
             self.logger.info(f"Read {len(nodes_from_db)} nodes from DB.")
             for existing_node in nodes_from_db.values():
@@ -142,7 +143,7 @@ class MeshtasticService(BotService):
             current_info.channel = node['channel']
         if 'hopsAway' in node and ('viaMqtt' not in node or node['viaMqtt'] == False):
             current_info.hops_away = node['hopsAway']
-        self.logger.info(f"Saving Node info to DB: {current_info}")
+        self.logger.info(f"Saving Node info: {current_info}")
         self._node_info_storage[node_id] = current_info
         self.event_bus.publish("meshtastic.node_update", current_info)
 
@@ -193,7 +194,7 @@ class MeshtasticService(BotService):
             current_info.snr = rx_snr
         if via_mqtt != None:
             current_info.via_mqtt = via_mqtt
-        self.logger.info(f"Saving Node info to DB: {current_info}")
+        self.logger.info(f"Saving Node info: {current_info}")
         self._node_info_storage[node_id] = current_info
         self.event_bus.publish("meshtastic.node_update", current_info)
 
@@ -259,17 +260,19 @@ class MeshtasticService(BotService):
         if rx_time != None:
             if current_info.last_heard is None or (rx_time > current_info.last_heard):
                 current_info.last_heard = rx_time
-        self.logger.info(f"Saving Node info to DB: {current_info}")
+        self.logger.info(f"Saving Node info: {current_info}")
         self._node_info_storage[node_id] = current_info
         self.event_bus.publish("meshtastic.node_update", current_info)
 
     def _on_receive_text_packet(self, packet, interface):
         # Called when a text packet arrives
         self.logger.info(f"Received text packet: {packet}")
+        payload = packet.get('decoded', {})
+        text = payload.get('text', '')
+        sender_id = packet.get('fromId', '')
+        receiver_id = packet.get('toId', '')
+        channel = packet.get('channel', None)
         try:
-            payload = packet.get('decoded', {})
-            text = payload.get('text', '')
-            sender_id = packet.get('fromId', '')
             if not text: 
                 self.logger.warn(f"Unable to parse text packet: missing decoded or text fields")
                 return
@@ -283,14 +286,19 @@ class MeshtasticService(BotService):
                 return
             # Message is not a duplicate
         except Exception as e:
-            self.logger.error(f"Error parsing packet: {e}")
+            self.logger.error(f"Error parsing packet: {e}", exc_info=True)
+
+        channel_log_value = packet.get('channel', -1)
+        if receiver_id != '^all':
+            channel_log_value = -1 # Magic number for DM
+        if self.db:
+            self.db.log_message(sender_id, channel_log_value)
+
         packet_id = None
         sender = None
         receiver = None
         node_id = None
-        receiver_id = None
         message = None
-        channel = None
         rx_time = None
         rx_snr = None
         hop_limit = None
@@ -305,12 +313,9 @@ class MeshtasticService(BotService):
         sender = packet["from"]
         receiver = packet["to"]
         node_id = packet["fromId"]
-        receiver_id = packet["toId"]
         message = packet["decoded"]["text"]
         if "transportMechanism" in packet:
             via_mqtt = packet['transportMechanism'] == "TRANSPORT_MQTT"
-        if "channel" in packet:
-            channel = packet["channel"]
         if "rxTime" in packet:
             rx_time = packet["rxTime"]
         if (via_mqtt is None or via_mqtt == False) and "rxSnr" in packet:
@@ -346,7 +351,8 @@ class MeshtasticService(BotService):
             want_ack,
             public_key,
             pki_encrypted,
-            via_mqtt
+            via_mqtt,
+            receiver_id != '^all'
         )
         current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
         if node_id in self._node_info_storage:
@@ -363,7 +369,7 @@ class MeshtasticService(BotService):
         if rx_time != None:
             if current_info.last_heard is None or (rx_time > current_info.last_heard):
                 current_info.last_heard = rx_time
-        self.logger.info(f"Saving Node info to DB: {current_info}")
+        self.logger.info(f"Saving Node info: {current_info}")
         self._node_info_storage[node_id] = current_info
         self.event_bus.publish("meshtastic.text_message", text_packet)
 
@@ -419,7 +425,7 @@ class MeshtasticService(BotService):
 
     def _save_node_db(self):
         self.logger.info(f"Saving {len(self._node_info_storage)} to DB.")
-        self._db.save_nodes(self._node_info_storage)
+        self.db.update_nodes(self._node_info_storage)
 
     def connect(self):
         self.logger.info(f"Connecting...")
