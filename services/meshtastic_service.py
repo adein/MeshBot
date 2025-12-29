@@ -103,7 +103,7 @@ class MeshtasticService(BotService):
         node_id = None
         if 'user' in node and 'id' in node['user']:
             node_id = node['user']['id']
-        if node_id == None:
+        if node_id == None or node_id == '':
             self.logger.warn(f"Node ID is missing in node packet!")
             return
         current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
@@ -161,7 +161,7 @@ class MeshtasticService(BotService):
         rx_snr = None
         via_mqtt = None
         node_id = packet["fromId"]
-        if node_id == None:
+        if node_id == None or node_id == '':
             self.logger.warn(f"Node ID is missing in position packet!")
             return
         if "transportMechanism" in packet:
@@ -181,6 +181,7 @@ class MeshtasticService(BotService):
         if node_id in self._node_info_storage:
             current_info = self._node_info_storage[node_id]
             self.logger.info(f"Updating existing node info: {current_info}")
+        current_info.node_id = node_id
         if altitude != None:
             current_info.altitude = altitude
         if latitude != None:
@@ -215,7 +216,7 @@ class MeshtasticService(BotService):
         rx_snr = None
         user = packet["decoded"]["user"]
         node_id = user["id"]
-        if node_id == None:
+        if node_id == None or node_id == '':
             self.logger.warn(f"Node ID is missing in user packet!")
             return
         via_mqtt = True
@@ -241,6 +242,7 @@ class MeshtasticService(BotService):
         if node_id in self._node_info_storage:
             current_info = self._node_info_storage[node_id]
             self.logger.info(f"Updating existing node info: {current_info}")
+        current_info.node_id = node_id
         if long_name != None:
             current_info.long_name = long_name
         if short_name != None:
@@ -354,24 +356,26 @@ class MeshtasticService(BotService):
             via_mqtt,
             receiver_id != '^all'
         )
-        current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
-        if node_id in self._node_info_storage:
-            current_info = self._node_info_storage[node_id]
-            self.logger.info(f"Updating existing node info: {current_info}")
-        if channel != None:
-            current_info.channel = channel
-        if public_key != None:
-            current_info.public_key = public_key
-        if via_mqtt != None:
-            current_info.via_mqtt = via_mqtt
-        if rx_snr != None:
-            current_info.snr = rx_snr
-        if rx_time != None:
-            if current_info.last_heard is None or (rx_time > current_info.last_heard):
-                current_info.last_heard = rx_time
-        self.logger.info(f"Saving Node info: {current_info}")
-        self._node_info_storage[node_id] = current_info
         self.event_bus.publish("meshtastic.text_message", text_packet)
+        if node_id != None and node_id != '':
+            current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
+            if node_id in self._node_info_storage:
+                current_info = self._node_info_storage[node_id]
+                self.logger.info(f"Updating existing node info: {current_info}")
+            current_info.node_id = node_id
+            if channel != None:
+                current_info.channel = channel
+            if public_key != None:
+                current_info.public_key = public_key
+            if via_mqtt != None:
+                current_info.via_mqtt = via_mqtt
+            if rx_snr != None:
+                current_info.snr = rx_snr
+            if rx_time != None:
+                if current_info.last_heard is None or (rx_time > current_info.last_heard):
+                    current_info.last_heard = rx_time
+            self.logger.info(f"Saving Node info: {current_info}")
+            self._node_info_storage[node_id] = current_info
 
     def _is_duplicate(self, msg_hash):
         """
