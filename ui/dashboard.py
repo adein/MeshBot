@@ -3,7 +3,7 @@ from rich.table import Table
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, RichLog, Static
 from textual.containers import Container
-from textual import on
+from textual import events, on
 import logging
 import yaml
 
@@ -52,6 +52,8 @@ class BotDashboard(App):
         self.plugin_mgr = plugin_mgr
         self.scheduler = scheduler
         self.event_bus = event_bus
+        self.command_history = []
+        self.history_index = 0
 
     def _load_config(self):
         try:
@@ -87,6 +89,7 @@ class BotDashboard(App):
         root_logger.addHandler(handler)
         self.console_output.write("[bold green]Welcome to the MeshBot admin console. Type help or ? to list commands.[/]")
         self.console_output.write("[bold yellow]Admin Console Ready.[/]")
+        self.query_one("#command_input").focus()
 
     @on(Input.Submitted, "#command_input")
     def handle_input(self, event: Input.Submitted):
@@ -97,8 +100,33 @@ class BotDashboard(App):
         if not command:
             return
 
+        if not self.command_history or self.command_history[-1] != command:
+            self.command_history.append(command)
+        self.history_index = len(self.command_history)
+
         self.console_output.write(f"[bold]> {command}[/]")
         self.process_command(command)
+
+    def on_key(self, event: events.Key):
+        """Intercept Up/Down arrows for history navigation."""
+        input_widget = self.query_one("#command_input")
+        if not input_widget.has_focus:
+            return
+        if event.key == "up":
+            if self.history_index > 0:
+                self.history_index -= 1
+                input_widget.value = self.command_history[self.history_index]
+                input_widget.cursor_position = len(input_widget.value)
+            event.stop()
+        elif event.key == "down":
+            if self.history_index < len(self.command_history):
+                self.history_index += 1
+                if self.history_index == len(self.command_history):
+                    input_widget.value = ""
+                else:
+                    input_widget.value = self.command_history[self.history_index]
+                    input_widget.cursor_position = len(input_widget.value)
+            event.stop()
 
     def process_command(self, cmd_text):
         """
