@@ -1,8 +1,11 @@
 datetime
+geopy
 meshtastic
 pubsub
 pyyaml
 requests
+reverse_geocoder
+rich
 schedule
 textual
 timezonefinder

@@ -117,7 +117,7 @@ class Database:
             # This only runs if the 'with' block finishes successfully
             self.logger.info(f"Successfully saved {len(data_tuples)} nodes.")
         except sqlite3.Error as e:
-            self.logger.error(f"SQLite error: {e}")
+            self.logger.error(f"SQLite error: {e}", exc_info=True)
 
     def load_nodes(self):
         """Loads all nodes from the DB into a dictionary."""
@@ -163,3 +163,26 @@ class Database:
             ORDER BY count DESC
         ''')
         return cursor.fetchall()
+
+    def search_nodes(self, query_text):
+        """
+        Searches nodes table for matching long_name, short_name, or node_id.
+        Returns a list of tuples, limited to 20 results.
+        """
+        cursor = self.conn.cursor()
+        clean_text = query_text.strip().lower()
+        wildcard_query = f"%{clean_text}%"
+        
+        try:
+            cursor.execute('''
+                SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                FROM nodes 
+                WHERE lower(long_name) LIKE ? 
+                   OR lower(short_name) LIKE ? 
+                   OR lower(node_id) LIKE ?
+                LIMIT 20
+            ''', (wildcard_query, wildcard_query, wildcard_query))
+            return cursor.fetchall()
+        except Exception as e:
+            self.logger.error(f"Search failed: {e}", exc_info=True)
+            return []
