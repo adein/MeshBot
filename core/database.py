@@ -173,6 +173,7 @@ class Database:
         clean_text = query_text.strip().lower()
         wildcard_query = f"%{clean_text}%"
         
+        self.logger.info(f"Searching for nodes matching: {clean_text}")
         try:
             cursor.execute('''
                 SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable

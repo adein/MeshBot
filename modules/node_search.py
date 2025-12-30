@@ -48,23 +48,32 @@ class NodeSearch(BotModule):
                 role = str(row[4] or "Unknown")
                 lat = row[5]
                 lon = row[6]
-                altitude = str(row[7]) if row[7] is not None else "Unknown"
-                snr = str(row[8]) if row[8] is not None else "Unknown"
-                mqtt = str(row[9]) if row[9] is not None else "Unknown"
-                channel = str(row[10]) if row[10] is not None else "Unknown"
-                hops = str(row[11]) if row[11] is not None else "Unknown"
+                altitude = str(row[7]) if row[7] is not None else "N/A"
+                snr = str(row[8]) if row[8] is not None else "N/A"
+                raw_mqtt = row[9]
+                channel = str(row[10]) if row[10] is not None else "N/A"
+                hops = str(row[11]) if row[11] is not None else "N/A"
                 raw_last_seen = row[12] 
-                unmessagable = str(row[13]) if row[13] is not None else "Unknown"
+                raw_unmessagable = row[13]
 
                 if lat and lon:
                     location_str = get_city_state_offline(lat, lon)
                 else:
                     location_str = "N/A"
+                if raw_mqtt == 1:
+                    mqtt = "Yes"
+                else:
+                    mqtt = "No"
                 if raw_last_seen:
                     dt = datetime.fromtimestamp(float(raw_last_seen))
-                    last_seen_str = dt.strftime("%Y-%m-%d %H:%M")
+                    last_seen_str = dt.strftime("%m-%d-%y %H:%M")
                 else:
-                    last_seen_str = "Never"
+                    last_seen_str = "N/A"
+                if raw_unmessagable == 1:
+                    unmessagable = "Yes"
+                else:
+                    unmessagable = "No"
+
                 name_to_show = long_name if long_name else short_name
                 current_string = ""
                 separater = ""
