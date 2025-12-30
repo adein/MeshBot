@@ -61,6 +61,7 @@ class MeshtasticService(BotService):
         self.interface = None
         self.monitor_thread = None
         self.seen_messages = {} # Format: {hash_string: timestamp}
+        self.node_storage_lock = threading.Lock()
         self.dedup_lock = threading.Lock()
         self.NODE_IP = self.config.get('node_ip', 4403)
         self.NODE_PORT = self.config.get('node_port', "0.0.0.0")
@@ -84,9 +85,10 @@ class MeshtasticService(BotService):
         nodes_from_db = self.db.load_nodes()
         if nodes_from_db != None and len(nodes_from_db) > 0:
             self.logger.info(f"Read {len(nodes_from_db)} nodes from DB.")
-            for existing_node in nodes_from_db.values():
-                if existing_node.node_id != None and existing_node.node_id not in self._node_info_storage:
-                    self._node_info_storage[existing_node.node_id] = existing_node
+            with self.node_storage_lock:
+                for existing_node in nodes_from_db.values():
+                    if existing_node.node_id != None and existing_node.node_id not in self._node_info_storage:
+                        self._node_info_storage[existing_node.node_id] = existing_node
         self.logger.info(f"Node DB initialized with {len(self._node_info_storage)} nodes.")
         self.event_bus.publish("meshtastic.connection_status", True)
 
@@ -107,9 +109,9 @@ class MeshtasticService(BotService):
             self.logger.warn(f"Node ID is missing in node packet!")
             return
         current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
-        if node_id in self._node_info_storage:
-            current_info = self._node_info_storage[node_id]
-            self.logger.info(f"Updating existing node info: {current_info}")
+        with self.node_storage_lock:
+            if node_id in self._node_info_storage:
+                current_info = self._node_info_storage[node_id]
         current_info.node_id = node_id
         if 'user' in node:
             if 'longName' in node['user']:
@@ -143,8 +145,7 @@ class MeshtasticService(BotService):
             current_info.channel = node['channel']
         if 'hopsAway' in node and ('viaMqtt' not in node or node['viaMqtt'] == False):
             current_info.hops_away = node['hopsAway']
-        self.logger.info(f"Saving Node info: {current_info}")
-        self._node_info_storage[node_id] = current_info
+        self._update_node(current_info)
         self.event_bus.publish("meshtastic.node_update", current_info)
 
     def _on_receive_position_packet(self, packet, interface):
@@ -178,9 +179,9 @@ class MeshtasticService(BotService):
         if "rxTime" in position:
             rx_time = position["rxTime"]
         current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
-        if node_id in self._node_info_storage:
-            current_info = self._node_info_storage[node_id]
-            self.logger.info(f"Updating existing node info: {current_info}")
+        with self.node_storage_lock:
+            if node_id in self._node_info_storage:
+                current_info = self._node_info_storage[node_id]
         current_info.node_id = node_id
         if altitude != None:
             current_info.altitude = altitude
@@ -195,8 +196,7 @@ class MeshtasticService(BotService):
             current_info.snr = rx_snr
         if via_mqtt != None:
             current_info.via_mqtt = via_mqtt
-        self.logger.info(f"Saving Node info: {current_info}")
-        self._node_info_storage[node_id] = current_info
+        self._update_node(current_info)
         self.event_bus.publish("meshtastic.node_update", current_info)
 
     def _on_receive_user_packet(self, packet, interface):
@@ -239,9 +239,9 @@ class MeshtasticService(BotService):
         if "rxTime" in packet:
             rx_time = packet["rxTime"]
         current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
-        if node_id in self._node_info_storage:
-            current_info = self._node_info_storage[node_id]
-            self.logger.info(f"Updating existing node info: {current_info}")
+        with self.node_storage_lock:
+            if node_id in self._node_info_storage:
+                current_info = self._node_info_storage[node_id]
         current_info.node_id = node_id
         if long_name != None:
             current_info.long_name = long_name
@@ -262,8 +262,7 @@ class MeshtasticService(BotService):
         if rx_time != None:
             if current_info.last_heard is None or (rx_time > current_info.last_heard):
                 current_info.last_heard = rx_time
-        self.logger.info(f"Saving Node info: {current_info}")
-        self._node_info_storage[node_id] = current_info
+        self._update_node(current_info)
         self.event_bus.publish("meshtastic.node_update", current_info)
 
     def _on_receive_text_packet(self, packet, interface):
@@ -283,7 +282,7 @@ class MeshtasticService(BotService):
             msg_hash = hashlib.md5(unique_str.encode('utf-8')).hexdigest()
             # Check for Duplicate
             if self._is_duplicate(msg_hash):
-                self.logger.info(f"♻️ Ignored duplicate message from {sender_id}: '{text}'")
+                self.logger.info(f"♻️ Ignored duplicate message from {sender_id}'")
                 return
             # Message is not a duplicate
         except Exception as e:
@@ -365,9 +364,9 @@ class MeshtasticService(BotService):
         self.event_bus.publish("meshtastic.text_message", text_packet)
         if node_id != None and node_id != '':
             current_info = NodeInfo(None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None)
-            if node_id in self._node_info_storage:
-                current_info = self._node_info_storage[node_id]
-                self.logger.info(f"Updating existing node info: {current_info}")
+            with self.node_storage_lock:
+                if node_id in self._node_info_storage:
+                    current_info = self._node_info_storage[node_id]
             current_info.node_id = node_id
             if channel != None:
                 current_info.channel = channel
@@ -380,8 +379,13 @@ class MeshtasticService(BotService):
             if rx_time != None:
                 if current_info.last_heard is None or (rx_time > current_info.last_heard):
                     current_info.last_heard = rx_time
-            self.logger.info(f"Saving Node info: {current_info}")
-            self._node_info_storage[node_id] = current_info
+            self._update_node(current_info)
+
+    def _update_node(self, node_info):
+        # Updates a single node in storage and DB
+        with self.node_storage_lock:
+            self._node_info_storage[node_info.node_id] = node_info
+        self.db.update_node(node_info)
 
     def _is_duplicate(self, msg_hash):
         """
@@ -434,8 +438,9 @@ class MeshtasticService(BotService):
                 self.logger.warn(f"Unable to send message - missing data!")
 
     def _save_node_db(self):
-        self.logger.info(f"Saving {len(self._node_info_storage)} to DB.")
-        self.db.update_nodes(self._node_info_storage)
+        with self.node_storage_lock:
+            self.logger.info(f"Saving {len(self._node_info_storage)} to DB.")
+            self.db.update_nodes(self._node_info_storage)
 
     def connect(self):
         self.logger.info(f"Connecting...")
@@ -505,11 +510,12 @@ class MeshtasticService(BotService):
 
     def get_node_info(self, node_id):
         self.logger.info(f"Get node info for {node_id} ...")
-        if node_id not in self._node_info_storage:
-            return None
-        node_info = self._node_info_storage[node_id]
-        node_info_copy = dataclasses.replace(node_info)
-        return node_info_copy
+        with self.node_storage_lock:
+            if node_id not in self._node_info_storage:
+                return None
+            node_info = self._node_info_storage[node_id]
+            node_info_copy = dataclasses.replace(node_info)
+            return node_info_copy
 
     def send_text(self, text, to_node_id=None, to_channel_number=None):
         self.logger.info(f"Send text message: {text} to channel: {to_channel_number}, node:{to_node_id}")
