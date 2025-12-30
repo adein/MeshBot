@@ -162,7 +162,7 @@ class BotDashboard(App):
 
             clean_args = args.strip()
             self.console_output.write(f"Searching for: [bold cyan]'{clean_args}'[/]...")
-            results = db.search_nodes(clean_args)
+            results = db.search_nodes(clean_args, limit=20)
 
             if not results:
                 self.console_output.write("[yellow]No matching nodes found.[/]")
@@ -260,7 +260,7 @@ class BotDashboard(App):
                     table.add_row(channel, count)
                 self.console_output.write(table)
             elif clean_args == "commands":
-                rows = db.get_top_commands()
+                rows = db.get_top_commands(limit=10)
                 table = Table(title=f"Bot Command Usage")
                 table.add_column("Command", style="cyan")
                 table.add_column("Invocations", style="green")
@@ -270,7 +270,7 @@ class BotDashboard(App):
                     table.add_row(command, count)
                 self.console_output.write(table)
             elif clean_args == "users":
-                rows = db.get_top_talkers()
+                rows = db.get_top_talkers(limit=20)
                 table = Table(title=f"Top Talkers")
                 table.add_column("User", style="cyan")
                 table.add_column("Channel", style="green")
