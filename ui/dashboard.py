@@ -1,3 +1,5 @@
+from datetime import datetime
+from rich.table import Table
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, RichLog, Static
 from textual.containers import Container
@@ -8,6 +10,8 @@ import yaml
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
 from ui.log_handler import TextualLogHandler
+from utils.geo_utils import get_city_state_offline
+from utils.geo_utils import get_city_state_online
 
 class BotDashboard(App):
     CSS = """
@@ -107,6 +111,82 @@ class BotDashboard(App):
         if base == "exit":
             self.exit()
         
+        elif base == "help" or base == "?":
+            self.console_output.write("[bold]Available Commands:[/]")
+            self.console_output.write("  [cyan]exit[/]: Exit the bot.")
+            self.console_output.write("  [cyan]help or ?[/]: Show this help message.")
+            self.console_output.write("  [cyan]node_search[/]: Search the node database.")
+            self.console_output.write("  [cyan]reload[/]: Reload configuration and modules.")
+            self.console_output.write("  [cyan]status[/]: Show status of all modules.")
+            self.console_output.write("  [cyan]toggle <module_name>[/]: Enable/Disable a module.")
+            
+        elif base == "node_search":
+            if not args:
+                self.console_output.write("[red]Usage: node_search <name or id>[/]")
+                return
+
+            # Access the DB Service via the Plugin Manager's registry
+            db = self.plugin_mgr.services.get('db')
+            if not db:
+                self.console_output.write("[bold red]Error: Database Service not loaded.[/]")
+                return
+
+            clean_args = args.strip()
+            self.console_output.write(f"Searching for: [bold cyan]'{clean_args}'[/]...")
+            results = db.search_nodes(clean_args)
+
+            if not results:
+                self.console_output.write("[yellow]No matching nodes found.[/]")
+            else:
+                #SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                # Create a pretty table
+                table = Table(title=f"Search Results ({len(results)})")
+                table.add_column("Node ID", style="cyan")
+                table.add_column("Long Name", style="green")
+                table.add_column("Short", style="magenta")
+                table.add_column("Hardware", style="white")
+                table.add_column("Role", style="blue")
+                table.add_column("Location", style="red")
+                table.add_column("Altitude", style="pink1")
+                table.add_column("SNR", style="yellow")
+                table.add_column("MQTT", style="purple")
+                table.add_column("Channel", style="sky_blue2")
+                table.add_column("Hops", style="orange1")
+                table.add_column("Unmessagable", style="violet")
+                table.add_column("Time", style="grey53")
+
+                for row in results:
+                    # Handle potential None values safely
+                    node_id = str(row[0] or "???")
+                    long_name = str(row[1] or "Unknown")
+                    short_name = str(row[2] or "Unknown")
+                    hw_model = str(row[3] or "Unknown")
+                    role = str(row[4] or "Unknown")
+                    lat = row[5]
+                    lon = row[6]
+                    altitude = str(row[7]) if row[7] is not None else "Unknown"
+                    snr = str(row[8]) if row[8] is not None else "Unknown"
+                    mqtt = str(row[9]) if row[9] is not None else "Unknown"
+                    channel = str(row[10]) if row[10] is not None else "Unknown"
+                    hops = str(row[11]) if row[11] is not None else "Unknown"
+                    raw_last_seen = row[12] 
+                    unmessagable = str(row[13]) if row[13] is not None else "Unknown"
+
+                    if lat and lon:
+                        location_str = get_city_state_offline(lat, lon)
+                    else:
+                        location_str = "N/A"
+                    if raw_last_seen:
+                        dt = datetime.fromtimestamp(float(raw_last_seen))
+                        last_seen_str = dt.strftime("%Y-%m-%d %H:%M")
+                    else:
+                        last_seen_str = "Never"
+
+                    table.add_row(node_id, long_name, short_name, hw_model, role, location_str, altitude, snr, mqtt, channel, hops, unmessagable, last_seen_str)
+
+                # Render the table to the console window
+                self.console_output.write(table)
+
         elif base == "reload":
             self.console_output.write("Reloading modules...")
             # Reload Config
@@ -135,13 +215,5 @@ class BotDashboard(App):
             else:
                 self.console_output.write(f"[bold red]Module {args} not found.[/]")
 
-        elif base == "help" or base == "?":
-            self.console_output.write("[bold]Available Commands:[/]")
-            self.console_output.write("  [cyan]help or ?[/]: Show this help message.")
-            self.console_output.write("  [cyan]exit[/]: Exit the bot.")
-            self.console_output.write("  [cyan]reload[/]: Reload configuration and modules.")
-            self.console_output.write("  [cyan]status[/]: Show status of all modules.")
-            self.console_output.write("  [cyan]toggle <module_name>[/]: Enable/Disable a module.")
-            
         else:
             self.console_output.write(f"[yellow]Unknown command: {base}[/]")
