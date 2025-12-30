@@ -225,7 +225,7 @@ class Database:
         finally:
             temp_conn.close()
 
-    def search_nodes(self, query_text):
+    def search_nodes(self, query_text, limit=3):
         """
         Searches nodes table for matching long_name, short_name, or node_id.
         Returns a list of tuples, limited to 20 results.
@@ -243,8 +243,8 @@ class Database:
                 WHERE lower(long_name) LIKE ? 
                    OR lower(short_name) LIKE ? 
                    OR lower(node_id) LIKE ?
-                LIMIT 20
-            ''', (wildcard_query, wildcard_query, wildcard_query))
+                LIMIT ?
+            ''', (wildcard_query, wildcard_query, wildcard_query, limit))
             return cursor.fetchall()
         except Exception as e:
             self.logger.error(f"Search failed: {e}", exc_info=True)
