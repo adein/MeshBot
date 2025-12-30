@@ -2,12 +2,13 @@ from interfaces.bot_module import BotModule
 from services.meshtastic_service import TextToSend
 
 class Help(BotModule):
-    GENERAL_HELP = "General commands: !about, !michmesh, !ping, !stats"
+    GENERAL_HELP = "General commands: !about, !michmesh, !nodesearch, !ping, !stats"
     WEATHER_HELP = "Weather commands: !alerts {location}, !forecast {location}, !weather {location}"
     HELP_ERROR = 'Unknown command. Try "!help" or "!help command"'
 
     ABOUT_CMD_HELP = 'Get information about this bot or how to get in contact with the owner'
     MICHMESH_CMD_HELP = 'Get information about configuring your meshtastic node to talk with Michiganders'
+    NODESEARCH_CMD_HELP = 'Search for information about a node by long name, short name, or node ID. Example: !nodesearch testnode'
     PING_CMD_HELP = 'Test your connection and reception by requesting a response back. Example: !ping'
     STATS_CMD_HELP = 'View stats about bot usage, channel activity, or user activity. Example !stats channels'
 
@@ -45,6 +46,9 @@ class Help(BotModule):
                 return
             elif help_subcommand == "michmesh":
                 self._send_message(self.MICHMESH_CMD_HELP, data)
+                return
+            elif help_subcommand == "nodesearch":
+                self._send_message(self.NODESEARCH_CMD_HELP, data)
                 return
             elif help_subcommand == "ping":
                 self._send_message(self.PING_CMD_HELP, data)

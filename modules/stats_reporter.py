@@ -11,7 +11,13 @@ class StatsReporter(BotModule):
         pass
 
     def handle_stats_request(self, data):
+        if not self.is_enabled():
+            return
         if not self.db:
+            return
+        self.logger.info(f"EVENT TRIGGERED: received stats request event with data {data}")
+        if data.sender_id is None or (data.receiver_id is None and data.channel is None):
+            self.logger.warn(f"Stats command is missing essential message data")
             return
 
         from_id = data.sender_id
