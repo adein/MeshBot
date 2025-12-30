@@ -145,6 +145,7 @@ class BotDashboard(App):
             self.console_output.write("  [cyan]help or ?[/]: Show this help message.")
             self.console_output.write("  [cyan]node_search[/]: Search the node database.")
             self.console_output.write("  [cyan]reload[/]: Reload configuration and modules.")
+            self.console_output.write("  [cyan]stats[/]: Show bot and mesh stats.")
             self.console_output.write("  [cyan]status[/]: Show status of all modules.")
             self.console_output.write("  [cyan]toggle <module_name>[/]: Enable/Disable a module.")
             
@@ -225,6 +226,65 @@ class BotDashboard(App):
             # Restart Scheduler Jobs
             self.scheduler.reload_jobs()
             self.console_output.write("System reloaded.")
+
+        elif base == "stats":
+            if not args:
+                self.console_output.write("[red]Usage: stats <channels|commands|users>[/]")
+                return
+            db = self.plugin_mgr.services.get('db')
+            if not db:
+                self.console_output.write("[bold red]Error: Database Service not loaded.[/]")
+                return
+            mesh = self.plugin_mgr.services.get('mesh')
+            if not mesh:
+                self.console_output.write("[bold red]Error: Meshtastic Service not loaded.[/]")
+                return
+            clean_args = args.strip()
+            if clean_args == "channels":
+                rows = db.get_channel_usage()
+                table = Table(title=f"Channel Usage")
+                table.add_column("Channel", style="cyan")
+                table.add_column("Messages", style="green")
+                for row in rows:
+                    channel = str(row[0]) if row[0] is not None else "Unknown"
+                    count = str(row[1]) if row[1] is not None else "Unknown"
+                    table.add_row(channel, count)
+                self.console_output.write(table)
+            elif clean_args == "commands":
+                rows = db.get_top_commands()
+                table = Table(title=f"Bot Command Usage")
+                table.add_column("Command", style="cyan")
+                table.add_column("Invocations", style="green")
+                for row in rows:
+                    command = str(row[0]) if row[0] is not None else "Unknown"
+                    count = str(row[1]) if row[1] is not None else "Unknown"
+                    table.add_row(command, count)
+                self.console_output.write(table)
+            elif clean_args == "users":
+                rows = db.get_top_talkers()
+                table = Table(title=f"Top Talkers")
+                table.add_column("User", style="cyan")
+                table.add_column("Channel", style="green")
+                table.add_column("Count", style="red")
+                for row in rows:
+                    if row[0] is not None:
+                        user_id = str(row[0])
+                        user_info = mesh.get_node_info(user_id)
+                        if user_info is not None and user_info.long_name:
+                            user_id = f"{user_info.long_name} ({user_id})"
+                    else:
+                        user_id = "Unknown"
+                    if row[1] == -1:
+                        channel = "DM"
+                    elif row[1] is not None:
+                        channel = str(row[1])
+                    else:
+                        channel = "Unknown"
+                    count = str(row[2]) if row[1] is not None else "Unknown"
+                    table.add_row(user_id, channel, count)
+                self.console_output.write(table)
+            else:
+                self.console_output.write("[red]Usage: stats <channels|commands|users>[/]")
 
         elif base == "status":
             self.console_output.write("--- STATUS REPORT ---")
