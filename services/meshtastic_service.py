@@ -273,7 +273,6 @@ class MeshtasticService(BotService):
         text = payload.get('text', '')
         sender_id = packet.get('fromId', '')
         receiver_id = packet.get('toId', '')
-        channel = packet.get('channel', None)
         try:
             if not text: 
                 self.logger.warn(f"Unable to parse text packet: missing decoded or text fields")
@@ -290,11 +289,18 @@ class MeshtasticService(BotService):
         except Exception as e:
             self.logger.error(f"Error parsing packet: {e}", exc_info=True)
 
-        channel_log_value = packet.get('channel', -1)
-        if receiver_id != '^all':
-            channel_log_value = -1 # Magic number for DM
+        channel_log_value = packet.get('channel', None)
+        if channel_log_value is None:
+            if receiver_id == '^all':
+                channel_log_value = 0 # Default public channel
+            elif receiver_id is not None:
+                channel_log_value = -1 # Magic number for DM
         if self.db:
             self.db.log_message(sender_id, channel_log_value)
+
+        channel = packet.get('channel', None)
+        if channel is None and receiver_id == '^all':
+            channel = 0
 
         packet_id = None
         sender = None
