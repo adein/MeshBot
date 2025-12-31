@@ -3,7 +3,6 @@ from zoneinfo import ZoneInfo
 from core.command_dispatcher import CommandData
 from timezonefinder import TimezoneFinder
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
 from services.positionstack_geocode_service import PositionstackGeocodeService
 from services.nws_weather_service import NwsWeatherService, WeatherAlert
 
@@ -42,12 +41,12 @@ class WeatherAlerts(BotModule):
         # Geocode query into coordinates
         arguments = data.parameters
         if arguments is None or len(arguments) <= 0:
-            self._send_message("You must provide a location.", data)
+            self.mesh_service.send_reply("You must provide a location.", data)
             return
         query = ' '.join(arguments)
         coords = self.geo_service.get_coords(query)
         if coords is None:
-            self._send_message(
+            self.mesh_service.send_reply(
                 "Unable to identify the location for your query.", data)
             return
         localzone = self._get_time_zone(coords.latitude, coords.longitude)
@@ -59,12 +58,13 @@ class WeatherAlerts(BotModule):
         self.local_tz = ZoneInfo(tz_string)
         zone = self.api_service.get_zone(coords.latitude, coords.longitude)
         if zone is None:
-            self._send_message(
+            self.mesh_service.send_reply(
                 "Unable to identify the location for your query.", data)
             return
         alerts = self.api_service.get_alerts(zone)
         if alerts is None or len(alerts) <= 0:
-            self._send_message("No active NWS alerts for that location.", data)
+            self.mesh_service.send_reply(
+                "No active NWS alerts for that location.", data)
             return
         now_utc = datetime.now(timezone.utc)
         valid_alerts = []
@@ -80,7 +80,8 @@ class WeatherAlerts(BotModule):
                 valid_alerts.append(alert_to_process)
         alert_summary = ""
         if len(valid_alerts) == 0:
-            self._send_message("No active NWS alerts for that location.", data)
+            self.mesh_service.send_reply(
+                "No active NWS alerts for that location.", data)
             return
         elif len(valid_alerts) == 1:
             alert = valid_alerts[0]
@@ -101,10 +102,10 @@ class WeatherAlerts(BotModule):
                     separater + self._process_alert(alert)
                 separater = "\n"
         if len(alert_summary) <= 0:
-            self._send_message(
+            self.mesh_service.send_reply(
                 "Error processing NWS alerts for that location.", data)
             return
-        self._send_message(alert_summary, data)
+        self.mesh_service.send_reply(alert_summary, data)
 
     def _get_time_zone(self, latitude: float, longitude: float) -> str | None:
         tf = TimezoneFinder()
@@ -116,30 +117,3 @@ class WeatherAlerts(BotModule):
         expires_local = expires_utc.astimezone(self.local_tz)
         expires_string = expires_local.strftime("%m/%d/%Y %I:%M %p")
         return alert.headline + ". Expires: " + expires_string
-
-    def _send_message(self, message: str, command_data: CommandData):
-        from_id = command_data.sender_id
-        to_id = command_data.receiver_id
-        channel_num = command_data.channel
-        if from_id is not None and to_id == self.my_node_id:
-            message_data = TextToSend(
-                message,
-                from_id,
-                None,
-                False
-            )
-            self.logger.info(
-                "Alert command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        elif channel_num is not None and to_id == "^all":
-            message_data = TextToSend(
-                message,
-                None,
-                channel_num,
-                False
-            )
-            self.logger.info(
-                "Alert command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        else:
-            self.logger.warning("Unable to handle alert command!")

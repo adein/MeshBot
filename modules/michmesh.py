@@ -1,6 +1,5 @@
 from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
 
 
 INFO = "MichMesh setup information: https://tinyurl.com/michmesh"
@@ -31,31 +30,4 @@ class MichMesh(BotModule):
             self.logger.info(
                 "MichMesh command is missing essential message data")
             return
-        self._send_message(INFO, data)
-
-    def _send_message(self, message: str, command_data: CommandData):
-        from_id = command_data.sender_id
-        to_id = command_data.receiver_id
-        channel_num = command_data.channel
-        if from_id is not None and to_id == self.my_node_id:
-            message_data = TextToSend(
-                message,
-                from_id,
-                None,
-                False
-            )
-            self.logger.info(
-                "MichMesh command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        elif channel_num is not None and to_id == "^all":
-            message_data = TextToSend(
-                message,
-                None,
-                channel_num,
-                False
-            )
-            self.logger.info(
-                "MichMesh command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        else:
-            self.logger.warning("Unable to handle michmesh command!")
+        self.mesh_service.send_reply(INFO, data)

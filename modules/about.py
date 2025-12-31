@@ -1,6 +1,5 @@
 from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
 
 
 ABOUT = "MeshBot by Adein"
@@ -47,31 +46,4 @@ class About(BotModule):
                     f" or by email at {self.contact_email}"
         if contact_message is not None:
             message_to_send = message_to_send + "\n" + contact_message
-        self._send_message(message_to_send, data)
-
-    def _send_message(self, message: str, command_data: CommandData):
-        from_id = command_data.sender_id
-        to_id = command_data.receiver_id
-        channel_num = command_data.channel
-        if from_id is not None and to_id == self.my_node_id:
-            message_data = TextToSend(
-                message,
-                from_id,
-                None,
-                False
-            )
-            self.logger.info(
-                "About command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        elif channel_num is not None and to_id == "^all":
-            message_data = TextToSend(
-                message,
-                None,
-                channel_num,
-                False
-            )
-            self.logger.info(
-                "About command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        else:
-            self.logger.warning("Unable to handle about command!")
+        self.mesh_service.send_reply(message_to_send, data)

@@ -1,6 +1,5 @@
 from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
 from services.positionstack_geocode_service import PositionstackGeocodeService
 from services.nws_weather_service import NwsWeatherService
 
@@ -37,22 +36,22 @@ class WeatherForecast(BotModule):
         # Geocode query into coordinates
         arguments = data.parameters
         if arguments is None or len(arguments) <= 0:
-            self._send_message("You must provide a location.", data)
+            self.mesh_service.send_reply("You must provide a location.", data)
             return
         query = ' '.join(arguments)
         coords = self.geo_service.get_coords(query)
         if coords is None:
-            self._send_message(
+            self.mesh_service.send_reply(
                 "Unable to identify the location for your query.", data)
             return
         zone = self.api_service.get_zone(coords.latitude, coords.longitude)
         if zone is None:
-            self._send_message(
+            self.mesh_service.send_reply(
                 "Unable to identify the location for your query.", data)
             return
         forecasts = self.api_service.get_forecasts(zone)
         if forecasts is None or len(forecasts) <= 0:
-            self._send_message(
+            self.mesh_service.send_reply(
                 "Unable to lookup the conditions for that location.", data)
             return
         forecast_summary = ""
@@ -69,34 +68,7 @@ class WeatherForecast(BotModule):
             elif len(forecast_summary) < 200:
                 forecast_summary = forecast_summary + "\n" + fname + ": " + desc
         if len(forecast_summary) <= 0:
-            self._send_message(
+            self.mesh_service.send_reply(
                 "Unable to lookup the forecast for that location.", data)
             return
-        self._send_message(forecast_summary, data)
-
-    def _send_message(self, message: str, command_data: CommandData):
-        from_id = command_data.sender_id
-        to_id = command_data.receiver_id
-        channel_num = command_data.channel
-        if from_id is not None and to_id == self.my_node_id:
-            message_data = TextToSend(
-                message,
-                from_id,
-                None,
-                False
-            )
-            self.logger.info(
-                "Forecast command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        elif channel_num is not None and to_id == "^all":
-            message_data = TextToSend(
-                message,
-                None,
-                channel_num,
-                False
-            )
-            self.logger.info(
-                "Forecast command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        else:
-            self.logger.warning("Unable to handle forecast command!")
+        self.mesh_service.send_reply(forecast_summary, data)

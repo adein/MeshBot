@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
 from services.nws_weather_service import NwsWeatherService, WeatherAlert
 
 
@@ -65,37 +64,21 @@ class NwsAlertChecker(BotModule):
         description = self._process_description(alert.description)
         remaining_size = 200 - len(summary_string) - 1
         if description is not None and len(description) > 3 and remaining_size > 20:
-            message_data = TextToSend(
-                summary_string + "\n" + description[:remaining_size],
-                None,
-                self.channel,
-                True
-            )
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
+            message = summary_string + "\n" + description[:remaining_size]
+            self.mesh_service.send_text(
+                message, to_channel_number=self.channel)
         elif len(summary_string) + len(area_string) <= 199:
-            message_data = TextToSend(
-                summary_string + "\n" + area_string,
-                None,
-                self.channel,
-                True
-            )
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
+            message = summary_string + "\n" + area_string
+            self.mesh_service.send_text(
+                message, to_channel_number=self.channel)
         elif len(summary_string) <= 200:
-            message_data = TextToSend(
-                summary_string,
-                None,
-                self.channel,
-                True
-            )
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
+            message = summary_string
+            self.mesh_service.send_text(
+                message, to_channel_number=self.channel)
         else:
-            message_data = TextToSend(
-                summary_string[:200],
-                None,
-                self.channel,
-                True
-            )
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
+            message = summary_string[:200]
+            self.mesh_service.send_text(
+                message, to_channel_number=self.channel)
 
     def _process_description(self, description: str) -> str:
         new_description = description.replace("* WHAT...", "")

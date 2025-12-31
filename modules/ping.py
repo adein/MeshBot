@@ -1,6 +1,5 @@
 from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
 
 
 class Ping(BotModule):
@@ -61,25 +60,4 @@ class Ping(BotModule):
             elif node_data is not None and node_data.hops_away is not None:
                 message = message + spacer + \
                     f"Previously observed hops away: {node_data.hops_away}"
-        if from_id is not None and to_id == self.my_node_id:
-            message_data = TextToSend(
-                message,
-                from_id,
-                None,
-                False
-            )
-            self.logger.info(
-                "Ping command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        elif channel_num is not None and to_id == "^all":
-            message_data = TextToSend(
-                message,
-                None,
-                channel_num,
-                False
-            )
-            self.logger.info(
-                "Ping command responding with payload: %s", message_data)
-            self.event_bus.publish(TO_SEND_TOPIC, message_data)
-        else:
-            self.logger.warning("Unable to handle ping command!")
+        self.mesh_service.send_reply(message, data)
