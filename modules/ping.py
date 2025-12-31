@@ -1,23 +1,31 @@
+from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TextToSend
+from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
+
 
 class Ping(BotModule):
-    def __init__(self, name, config, global_services, my_node=None):
+    """
+    Module to respond to 'ping' commands with 'pong' messages.
+    """
+
+    def __init__(self, name: str, config, global_services: dict, my_node: str):
         super().__init__(name, config, global_services, my_node)
         # Listen for the command event
         if self.event_bus:
             self.event_bus.subscribe("bot.command.ping", self._handle_command)
 
     def execute(self):
-        # Triggered vs scheduled, so this is empty
+        # Triggered, so this is empty
         pass
 
-    def _handle_command(self, data):
+    def _handle_command(self, data: CommandData):
         if not self.is_enabled():
             return
-        self.logger.info(f"EVENT TRIGGERED: received ping command with payload: {data}")
+        self.logger.info(
+            "EVENT TRIGGERED: received ping command with payload: %s", data)
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.info(f"Ping command is missing essential message data")
+            self.logger.warning(
+                "Ping command is missing essential message data")
             return
         from_id = data.sender_id
         to_id = data.receiver_id
@@ -28,48 +36,50 @@ class Ping(BotModule):
         message = ""
         sender = f"{from_id}"
         node_data = self.db.get_node(from_id)
-        if node_data != None:
-            if node_data.long_name != None:
+        if node_data is not None:
+            if node_data.long_name is not None:
                 sender = f"{node_data.long_name}"
-            elif node_data.short_name != None:
+            elif node_data.short_name is not None:
                 sender = f"{node_data.short_name}"
         message = f"Pong @{sender}!"
-        if via_mqtt == True:
+        if via_mqtt is True:
             message = message + " Heard via MQTT."
         else:
             message = message + " Heard via LoRa radio."
-        if snr != None or (node_data != None and node_data.snr != None) or hops_away != None or (node_data != None and node_data.hops_away != None):
+        if snr is not None or (node_data is not None and node_data.snr is not None) or hops_away is not None or (node_data is not None and node_data.hops_away is not None):
             message = message + "\n"
             spacer = ""
-            if snr != None:
+            if snr is not None:
                 message = message + spacer + f"SNR: {snr}"
                 spacer = ", "
-            elif node_data != None and node_data.snr != None:
-                message = message + spacer + f"Previously observed SNR: {node_data.snr}"
+            elif node_data is not None and node_data.snr is not None:
+                message = message + spacer + \
+                    f"Previously observed SNR: {node_data.snr}"
                 spacer = ", "
-            if hops_away != None:
+            if hops_away is not None:
                 message = message + spacer + f"Hops away: {hops_away}"
-                spacer = ", "
-            elif node_data != None and node_data.hops_away != None:
-                message = message + spacer + f"Previously observed hops away: {node_data.hops_away}"
-                spacer = ", "
-        if from_id != None and to_id == self.my_node_id:
+            elif node_data is not None and node_data.hops_away is not None:
+                message = message + spacer + \
+                    f"Previously observed hops away: {node_data.hops_away}"
+        if from_id is not None and to_id == self.my_node_id:
             message_data = TextToSend(
-                    message,
-                    from_id,
-                    None,
-                    False
+                message,
+                from_id,
+                None,
+                False
             )
-            self.logger.info(f"Ping command responding with payload: {message_data}")
-            self.event_bus.publish("meshtastic_service.to_send", message_data)
-        elif channel_num != None and to_id == "^all":
+            self.logger.info(
+                "Ping command responding with payload: %s", message_data)
+            self.event_bus.publish(TO_SEND_TOPIC, message_data)
+        elif channel_num is not None and to_id == "^all":
             message_data = TextToSend(
-                    message,
-                    None,
-                    channel_num,
-                    False
+                message,
+                None,
+                channel_num,
+                False
             )
-            self.logger.info(f"Ping command responding with payload: {message_data}")
-            self.event_bus.publish("meshtastic_service.to_send", message_data)
+            self.logger.info(
+                "Ping command responding with payload: %s", message_data)
+            self.event_bus.publish(TO_SEND_TOPIC, message_data)
         else:
-            self.logger.warn(f"Unable to handle ping command!")
+            self.logger.warning("Unable to handle ping command!")

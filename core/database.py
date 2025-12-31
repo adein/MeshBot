@@ -4,9 +4,14 @@ import threading
 
 from dataclasses import dataclass, asdict
 
+from core.event_bus import EventBus
+
 
 @dataclass
 class NodeInfo:
+    """
+    Dataclass to hold node information.
+    """
     __slots__ = ['node_id', 'long_name', 'short_name', 'mac_address', 'hardware', 'role',
                  'public_key', 'unmessagable', 'latitude', 'longitude', 'altitude',
                  'snr', 'last_heard', 'channel', 'via_mqtt', 'hops_away']
@@ -29,15 +34,24 @@ class NodeInfo:
 
 
 class Database:
-    def __init__(self, event_bus, config):
-        self.event_bus = event_bus
+    """
+    Database service for the bot.
+    Stores node details and command/message statistics.
+    """
+
+    def __init__(self, event_bus: EventBus, config):
+        self.event_bus: EventBus = event_bus
         self.config = config
         self.logger = logging.getLogger("Service.Database")
-        self.db_path = self.config.get('db_path', "bot_data.db")
-        self.conn = None
-        self.db_lock = threading.Lock()
+        self.db_path: str = self.config.get('db_path', "bot_data.db")
+        self.conn: sqlite3.Connection | None = None
+        self.db_lock: threading.Lock = threading.Lock()
 
     def connect(self):
+        """
+        Establishes the database connection and configures it.
+        Creates tables if needed.
+        """
         self.conn = sqlite3.connect(
             self.db_path, check_same_thread=False, timeout=30.0)
         try:
@@ -50,6 +64,9 @@ class Database:
         self.logger.info("Database connected.")
 
     def disconnect(self):
+        """
+        Closes the database connection.
+        """
         if self.conn:
             with self.db_lock:
                 self.conn.close()
@@ -86,7 +103,15 @@ class Database:
             ''')
             self.conn.commit()
 
-    def log_command(self, command_name, user_id):
+    def log_command(self, command_name: str, user_id: str):
+        """
+        Logs a command usage.
+
+        :param command_name: The command that was used.
+        :type command_name: str
+        :param user_id: The (node) ID of the user who issued the command.
+        :type user_id: str
+        """
         try:
             with self.db_lock:
                 with self.conn:
@@ -97,7 +122,15 @@ class Database:
         except Exception as e:
             self.logger.error("Failed to log command: %s", e, exc_info=True)
 
-    def log_message(self, user_id, channel_number):
+    def log_message(self, user_id: str, channel_number: int):
+        """
+        Logs a message sent by a user.
+
+        :param user_id: The (node) ID of the user who sent the message.
+        :type user_id: str
+        :param channel_number: The channel number where the message was sent.
+        :type channel_number: int
+        """
         try:
             with self.db_lock:
                 with self.conn:
@@ -108,10 +141,12 @@ class Database:
         except Exception as e:
             self.logger.error("Failed to log message: %s", e, exc_info=True)
 
-    def update_node(self, node_info):
+    def update_node(self, node_info: NodeInfo):
         """
         Updates (or creates) a single node record immediately.
-        Accepts a NodeInfo dataclass object.
+
+        :param node_info: The node details to store.
+        :type node_info: NodeInfo
         """
         try:
             # Convert Dataclass to Dictionary
@@ -140,10 +175,14 @@ class Database:
             self.logger.error("Failed to update node %s: %s",
                               nid, e, exc_info=True)
 
-    def get_node(self, node_id):
+    def get_node(self, node_id: str) -> NodeInfo | None:
         """
-        Retrieves a single node by ID.
-        Returns: NodeInfo object or None.
+        Retrieves details of a single node by ID.
+
+        :param node_id: The ID of the node to retrieve.
+        :type node_id: str
+        :return: The NodeInfo if found, else None.
+        :rtype: NodeInfo | None
         """
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
@@ -161,7 +200,15 @@ class Database:
         finally:
             temp_conn.close()
 
-    def get_top_commands(self, limit=5):
+    def get_top_commands(self, limit: int = 5) -> list[sqlite3.Row]:
+        """
+        Returns the most used commands.
+
+        :param limit: Number of top commands to return.
+        :type limit: int
+        :return: List of rows containing (command, count).
+        :rtype: list[Row]
+        """
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -177,8 +224,15 @@ class Database:
         finally:
             temp_conn.close()
 
-    def get_top_talkers(self, limit=5):
-        """Returns (User ID, Channel, Count)"""
+    def get_top_talkers(self, limit: int = 5) -> list[sqlite3.Row]:
+        """
+        Returns the most active users by message count.
+
+        :param limit: Number of top talkers to return.
+        :type limit: int
+        :return: List of rows containing (node_id, channel, count).
+        :rtype: list[Row]
+        """
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -194,10 +248,13 @@ class Database:
         finally:
             temp_conn.close()
 
-    def get_channel_usage(self):
+    def get_channel_usage(self) -> list[sqlite3.Row]:
         """
-        Returns total volume per channel.
+        Returns the total messages per channel.
         EXCLUDES Direct Messages (channel -1).
+
+        :return: List of rows containing (channel, count).
+        :rtype: list[Row]
         """
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
@@ -214,10 +271,16 @@ class Database:
         finally:
             temp_conn.close()
 
-    def search_nodes(self, query_text, limit=3):
+    def search_nodes(self, query_text: str, limit: int = 3) -> list[sqlite3.Row]:
         """
-        Searches nodes table for matching long_name, short_name, or node_id.
-        Returns a list of tuples, limited to 20 results.
+        Searches for nodes matching the query string.
+
+        :param query_text: The text to search for in long_name, short_name, node_id, or hardware.
+        :type query_text: str
+        :param limit: Number of results to return.
+        :type limit: int
+        :return: List of rows containing node information.
+        :rtype: list[Row]
         """
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
@@ -232,8 +295,9 @@ class Database:
                 WHERE lower(long_name) LIKE ? 
                    OR lower(short_name) LIKE ? 
                    OR lower(node_id) LIKE ?
+                   OR lower(hardware) LIKE ?
                 LIMIT ?
-            ''', (wildcard_query, wildcard_query, wildcard_query, limit))
+            ''', (wildcard_query, wildcard_query, wildcard_query, wildcard_query, limit))
             return cursor.fetchall()
         except Exception as e:
             self.logger.error("Search failed: %s", e, exc_info=True)

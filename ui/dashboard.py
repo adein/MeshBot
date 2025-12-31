@@ -1,20 +1,22 @@
+import logging
 from datetime import datetime
+
+import yaml
 from rich.table import Table
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, RichLog, Static
-from textual.containers import Container
+from textual.widgets import Header, Footer, Input, RichLog
 from textual import events, on
-import logging
-import yaml
 
+from core.event_bus import EventBus
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
 from ui.log_handler import TextualLogHandler
 from utils.geo_utils import get_city_state_offline
-from utils.geo_utils import get_city_state_online
 
 
 class BotDashboard(App):
+    """Textual-based TUI Dashboard for MeshBot."""
+
     CSS = """
     Screen {
         layout: grid;
@@ -48,13 +50,17 @@ class BotDashboard(App):
     }
     """
 
-    def __init__(self, plugin_mgr, scheduler, event_bus):
+    def __init__(self, plugin_mgr: PluginManager, scheduler: BotScheduler, event_bus: EventBus):
         super().__init__()
-        self.plugin_mgr = plugin_mgr
-        self.scheduler = scheduler
-        self.event_bus = event_bus
-        self.command_history = []
-        self.history_index = 0
+        self.plugin_mgr: PluginManager = plugin_mgr
+        self.scheduler: BotScheduler = scheduler
+        self.event_bus: EventBus = event_bus
+        self.console_output: RichLog = RichLog(
+            highlight=True, markup=True, id="console_output")
+        self.system_log: RichLog = RichLog(
+            highlight=True, markup=True, id="system_log")
+        self.command_history: list[str] = []
+        self.history_index: int = 0
 
     def _load_config(self):
         try:
@@ -62,19 +68,16 @@ class BotDashboard(App):
                 return yaml.safe_load(f)
         except FileNotFoundError:
             logging.error("config.yaml not found!")
-            self.console_output.write(f"[bold red]config.yaml not found!")
+            self.console_output.write("[bold red]config.yaml not found!")
             self.exit()
 
     def compose(self) -> ComposeResult:
         """Create the UI layout."""
         yield Header(show_clock=True)
 
-        self.system_log = RichLog(highlight=True, markup=True, id="system_log")
         self.system_log.border_title = "System Activity"
         yield self.system_log
 
-        self.console_output = RichLog(
-            highlight=True, markup=True, id="console_output")
         self.console_output.border_title = "Command Output"
         yield self.console_output
 
@@ -97,7 +100,7 @@ class BotDashboard(App):
     @on(Input.Submitted, "#command_input")
     def handle_input(self, event: Input.Submitted):
         """Runs when user presses Enter."""
-        command = event.value.strip()
+        command: str = event.value.strip()
         self.query_one("#command_input").value = ""  # Clear input
 
         if not command:
@@ -131,13 +134,16 @@ class BotDashboard(App):
                     input_widget.cursor_position = len(input_widget.value)
             event.stop()
 
-    def process_command(self, cmd_text):
+    def process_command(self, cmd_text: str):
         """
-        Console commands.
+        Process a command entered by the administrator.
+
+        :param cmd_text: The full command text entered.
+        :type cmd_text: str
         """
         parts = cmd_text.split()
-        base = parts[0].lower()
-        args = parts[1] if len(parts) > 1 else None
+        base = parts[0].lower().removeprefix("!")
+        args = parts[1:] if len(parts) > 1 else None
 
         if base == "exit":
             self.exit()
@@ -171,7 +177,7 @@ class BotDashboard(App):
                     "[bold red]Error: Database Service not loaded.[/]")
                 return
 
-            clean_args = args.strip()
+            clean_args = ' '.join(args)
             self.console_output.write(
                 f"Searching for: [bold cyan]'{clean_args}'[/]...")
             results = db.search_nodes(clean_args, limit=20)
@@ -180,7 +186,6 @@ class BotDashboard(App):
                 self.console_output.write(
                     "[yellow]No matching nodes found.[/]")
             else:
-                # SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
                 # Create a pretty table
                 table = Table(title=f"Search Results ({len(results)})")
                 table.add_column("Node ID", style="cyan")
@@ -264,10 +269,10 @@ class BotDashboard(App):
                 self.console_output.write(
                     "[bold red]Error: Meshtastic Service not loaded.[/]")
                 return
-            clean_args = args.strip()
+            clean_args = args[0].lower()
             if clean_args == "channels":
                 rows = db.get_channel_usage()
-                table = Table(title=f"Channel Usage")
+                table = Table(title="Channel Usage")
                 table.add_column("Channel", style="cyan")
                 table.add_column("Messages", style="green")
                 for row in rows:
@@ -277,7 +282,7 @@ class BotDashboard(App):
                 self.console_output.write(table)
             elif clean_args == "commands":
                 rows = db.get_top_commands(limit=10)
-                table = Table(title=f"Bot Command Usage")
+                table = Table(title="Bot Command Usage")
                 table.add_column("Command", style="cyan")
                 table.add_column("Invocations", style="green")
                 for row in rows:
@@ -287,7 +292,7 @@ class BotDashboard(App):
                 self.console_output.write(table)
             elif clean_args == "users":
                 rows = db.get_top_talkers(limit=20)
-                table = Table(title=f"Top Talkers")
+                table = Table(title="Top Talkers")
                 table.add_column("User", style="cyan")
                 table.add_column("Channel", style="green")
                 table.add_column("Count", style="red")
@@ -320,15 +325,17 @@ class BotDashboard(App):
             self.console_output.write("---------------------")
 
         elif base == "toggle" and args:
-            mod = self.plugin_mgr.get_module(args)
+            module_name = args[0]
+            mod = self.plugin_mgr.get_module(module_name)
             if mod:
                 mod.config['enabled'] = not mod.config['enabled']
                 state = "Enabled" if mod.config['enabled'] else "Disabled"
-                self.console_output.write(f"Module {args} is now {state}")
+                self.console_output.write(
+                    f"Module {module_name} is now {state}")
                 self.scheduler.reload_jobs()
             else:
                 self.console_output.write(
-                    f"[bold red]Module {args} not found.[/]")
+                    f"[bold red]Module {module_name} not found.[/]")
 
         else:
             self.console_output.write(f"[yellow]Unknown command: {base}[/]")

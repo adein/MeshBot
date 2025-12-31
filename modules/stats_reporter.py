@@ -1,27 +1,33 @@
+from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
-from services.meshtastic_service import TextToSend
+from services.meshtastic_service import TO_SEND_TOPIC, TextToSend
 
 
 class StatsReporter(BotModule):
-    def __init__(self, name, config, global_services, my_node=None):
+    """
+    Module to respond to 'stats' commands with usage statistics.
+    """
+
+    def __init__(self, name: str, config, global_services: dict, my_node: str):
         super().__init__(name, config, global_services, my_node)
         if self.event_bus:
             self.event_bus.subscribe(
                 "bot.command.stats", self.handle_stats_request)
 
     def execute(self):
+        # Triggered, so this is empty
         pass
 
-    def handle_stats_request(self, data):
+    def handle_stats_request(self, data: CommandData):
         if not self.is_enabled():
             return
         if not self.db:
             return
         self.logger.info(
-            f"EVENT TRIGGERED: received stats request event with data {data}")
+            "EVENT TRIGGERED: received stats request event with data %s", data)
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.warn(
-                f"Stats command is missing essential message data")
+            self.logger.warning(
+                "Stats command is missing essential message data")
             return
 
         from_id = data.sender_id
@@ -61,7 +67,7 @@ class StatsReporter(BotModule):
             output.append("Usage: !stats [commands|users|channels]")
         # Reply via the service
         message = "\n".join(output)
-        if from_id != None and to_id == self.my_node_id:
+        if from_id is not None and to_id == self.my_node_id:
             message_data = TextToSend(
                 message,
                 from_id,
@@ -69,9 +75,9 @@ class StatsReporter(BotModule):
                 False
             )
             self.logger.info(
-                f"Stats command responding with payload: {message_data}")
-            self.event_bus.publish("meshtastic_service.to_send", message_data)
-        elif channel_num != None and to_id == "^all":
+                "Stats command responding with payload: %s", message_data)
+            self.event_bus.publish(TO_SEND_TOPIC, message_data)
+        elif channel_num is not None and to_id == "^all":
             message_data = TextToSend(
                 message,
                 None,
@@ -79,7 +85,7 @@ class StatsReporter(BotModule):
                 False
             )
             self.logger.info(
-                f"Stats command responding with payload: {message_data}")
-            self.event_bus.publish("meshtastic_service.to_send", message_data)
+                "Stats command responding with payload: %s", message_data)
+            self.event_bus.publish(TO_SEND_TOPIC, message_data)
         else:
-            self.logger.warn(f"Unable to handle stats command!")
+            self.logger.warning("Unable to handle stats command!")
