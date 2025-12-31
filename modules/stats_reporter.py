@@ -1,11 +1,13 @@
 from interfaces.bot_module import BotModule
 from services.meshtastic_service import TextToSend
 
+
 class StatsReporter(BotModule):
     def __init__(self, name, config, global_services, my_node=None):
         super().__init__(name, config, global_services, my_node)
         if self.event_bus:
-            self.event_bus.subscribe("bot.command.stats", self.handle_stats_request)
+            self.event_bus.subscribe(
+                "bot.command.stats", self.handle_stats_request)
 
     def execute(self):
         pass
@@ -15,9 +17,11 @@ class StatsReporter(BotModule):
             return
         if not self.db:
             return
-        self.logger.info(f"EVENT TRIGGERED: received stats request event with data {data}")
+        self.logger.info(
+            f"EVENT TRIGGERED: received stats request event with data {data}")
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.warn(f"Stats command is missing essential message data")
+            self.logger.warn(
+                f"Stats command is missing essential message data")
             return
 
         from_id = data.sender_id
@@ -39,7 +43,7 @@ class StatsReporter(BotModule):
             output.append("🗣️ Top Talkers (Channel | Count | User)")
             for user, channel, count in rows:
                 user_display = user
-                user_info = self.mesh_service.get_node_info(user)
+                user_info = self.db.get_node(user)
                 if user_info is not None and user_info.long_name:
                     user_display = user_info.long_name
                 chan_str = f"Ch {channel}"
@@ -59,21 +63,23 @@ class StatsReporter(BotModule):
         message = "\n".join(output)
         if from_id != None and to_id == self.my_node_id:
             message_data = TextToSend(
-                    message,
-                    from_id,
-                    None,
-                    False
+                message,
+                from_id,
+                None,
+                False
             )
-            self.logger.info(f"Stats command responding with payload: {message_data}")
+            self.logger.info(
+                f"Stats command responding with payload: {message_data}")
             self.event_bus.publish("meshtastic_service.to_send", message_data)
         elif channel_num != None and to_id == "^all":
             message_data = TextToSend(
-                    message,
-                    None,
-                    channel_num,
-                    False
+                message,
+                None,
+                channel_num,
+                False
             )
-            self.logger.info(f"Stats command responding with payload: {message_data}")
+            self.logger.info(
+                f"Stats command responding with payload: {message_data}")
             self.event_bus.publish("meshtastic_service.to_send", message_data)
         else:
             self.logger.warn(f"Unable to handle stats command!")

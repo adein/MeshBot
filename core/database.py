@@ -2,29 +2,30 @@ import logging
 import sqlite3
 import threading
 
-from dataclasses import dataclass, asdict, fields
+from dataclasses import dataclass, asdict
+
 
 @dataclass
 class NodeInfo:
-    __slots__ = ['node_id', 'long_name', 'short_name', 'mac_address', 'hardware', 'role', 
-                 'public_key', 'unmessagable', 'latitude', 'longitude', 'altitude', 
+    __slots__ = ['node_id', 'long_name', 'short_name', 'mac_address', 'hardware', 'role',
+                 'public_key', 'unmessagable', 'latitude', 'longitude', 'altitude',
                  'snr', 'last_heard', 'channel', 'via_mqtt', 'hops_away']
     node_id: str
-    long_name: str
-    short_name: str
-    mac_address: str
-    hardware: str
-    role: str
-    public_key: str
-    unmessagable: bool
-    latitude: float
-    longitude: float
-    altitude: int
-    snr: float
-    last_heard: int
-    channel: int
-    via_mqtt: bool
-    hops_away: int
+    long_name: str | None
+    short_name: str | None
+    mac_address: str | None
+    hardware: str | None
+    role: str | None
+    public_key: str | None
+    unmessagable: bool | None
+    latitude: float | None
+    longitude: float | None
+    altitude: int | None
+    snr: float | None
+    last_heard: int | None
+    channel: int | None
+    via_mqtt: bool | None
+    hops_away: int | None
 
 
 class Database:
@@ -32,18 +33,19 @@ class Database:
         self.event_bus = event_bus
         self.config = config
         self.logger = logging.getLogger("Service.Database")
-        self.DB_PATH = self.config.get('db_path', "bot_data.db")
+        self.db_path = self.config.get('db_path', "bot_data.db")
         self.conn = None
         self.db_lock = threading.Lock()
 
     def connect(self):
-        self.conn = sqlite3.connect(self.DB_PATH, check_same_thread=False, timeout=30.0)
+        self.conn = sqlite3.connect(
+            self.db_path, check_same_thread=False, timeout=30.0)
         try:
             self.conn.execute("PRAGMA journal_mode=WAL;")
             self.conn.execute("PRAGMA synchronous=NORMAL;")
-            self.conn.row_factory = sqlite3.Row 
+            self.conn.row_factory = sqlite3.Row
         except Exception as e:
-            self.logger.error(f"Failed to configure DB: {e}", exc_info=True)
+            self.logger.error("Failed to configure DB: %s", e, exc_info=True)
         self._create_tables()
         self.logger.info("Database connected.")
 
@@ -93,18 +95,18 @@ class Database:
                         (command_name, user_id)
                     )
         except Exception as e:
-            self.logger.error(f"Failed to log command: {e}", exc_info=True)
+            self.logger.error("Failed to log command: %s", e, exc_info=True)
 
     def log_message(self, user_id, channel_number):
         try:
             with self.db_lock:
                 with self.conn:
                     self.conn.execute(
-                        "INSERT INTO message_stats (user_id, channel) VALUES (?, ?)", 
+                        "INSERT INTO message_stats (user_id, channel) VALUES (?, ?)",
                         (user_id, channel_number)
                     )
         except Exception as e:
-            self.logger.error(f"Failed to log message: {e}", exc_info=True)
+            self.logger.error("Failed to log message: %s", e, exc_info=True)
 
     def update_node(self, node_info):
         """
@@ -132,48 +134,35 @@ class Database:
                             :last_heard, :channel, :via_mqtt, :hops_away
                         )
                     ''', data)
-                    
+
         except Exception as e:
             nid = getattr(node_info, 'node_id', 'UNKNOWN')
-            self.logger.error(f"Failed to update node {nid}: {e}")
+            self.logger.error("Failed to update node %s: %s",
+                              nid, e, exc_info=True)
 
-    def update_nodes(self, node_dict):
-        """Saves a dictionary of {id: NodeInfo} to the DB."""
-        self.logger.info(f"Attempting to save {len(node_dict)} nodes to DB...")
-        if not node_dict:
-            self.logger.warn(f"Node dictionary is None")
-            return
-        # Extract the data into the list of tuples you provided
-        data_tuples = [tuple(getattr(node, field) for field in NodeInfo.__slots__) 
-                       for node in node_dict.values()]
-        try:
-            with self.db_lock:
-                # Use a context manager to ensure the transaction is committed to disk
-                with self.conn:
-                    query = f"""
-                    INSERT OR REPLACE INTO nodes ({', '.join(NodeInfo.__slots__)})
-                    VALUES ({', '.join(['?'] * len(NodeInfo.__slots__))})
-                    """
-                    self.conn.executemany(query, data_tuples)
-                # This only runs if the 'with' block finishes successfully
-                self.logger.info(f"Successfully saved {len(data_tuples)} nodes.")
-        except sqlite3.Error as e:
-            self.logger.error(f"SQLite error: {e}", exc_info=True)
-
-    def load_nodes(self):
-        """Loads all nodes from the DB into a dictionary."""
-        temp_conn = sqlite3.connect(self.DB_PATH, timeout=10.0)
+    def get_node(self, node_id):
+        """
+        Retrieves a single node by ID.
+        Returns: NodeInfo object or None.
+        """
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
-            cursor = temp_conn.execute("SELECT * FROM nodes")
-            rows = cursor.fetchall()
-            # Use dictionary unpacking to recreate the dataclass instances
-            return {row['node_id']: NodeInfo(**dict(row)) for row in rows}
+            cursor = temp_conn.execute(
+                "SELECT * FROM nodes WHERE node_id = ?", (node_id))
+            row = cursor.fetchone()
+            if row:
+                return NodeInfo(**dict(row))
+            return None
+        except Exception as e:
+            self.logger.error("Failed to get node %s: %s",
+                              node_id, e, exc_info=True)
+            return None
         finally:
             temp_conn.close()
 
     def get_top_commands(self, limit=5):
-        temp_conn = sqlite3.connect(self.DB_PATH, timeout=10.0)
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.cursor()
@@ -190,7 +179,7 @@ class Database:
 
     def get_top_talkers(self, limit=5):
         """Returns (User ID, Channel, Count)"""
-        temp_conn = sqlite3.connect(self.DB_PATH, timeout=10.0)
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.cursor()
@@ -210,7 +199,7 @@ class Database:
         Returns total volume per channel.
         EXCLUDES Direct Messages (channel -1).
         """
-        temp_conn = sqlite3.connect(self.DB_PATH, timeout=10.0)
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.cursor()
@@ -230,13 +219,13 @@ class Database:
         Searches nodes table for matching long_name, short_name, or node_id.
         Returns a list of tuples, limited to 20 results.
         """
-        temp_conn = sqlite3.connect(self.DB_PATH, timeout=10.0)
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.cursor()
             clean_text = query_text.strip().lower()
             wildcard_query = f"%{clean_text}%"
-            self.logger.info(f"Searching for nodes matching: {clean_text}")
+            self.logger.info("Searching for nodes matching: %s", clean_text)
             cursor.execute('''
                 SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
                 FROM nodes 
@@ -247,7 +236,7 @@ class Database:
             ''', (wildcard_query, wildcard_query, wildcard_query, limit))
             return cursor.fetchall()
         except Exception as e:
-            self.logger.error(f"Search failed: {e}", exc_info=True)
+            self.logger.error("Search failed: %s", e, exc_info=True)
             return []
         finally:
             temp_conn.close()

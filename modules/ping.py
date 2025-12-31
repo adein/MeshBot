@@ -27,7 +27,7 @@ class Ping(BotModule):
         hops_away = data.hops_away
         message = ""
         sender = f"{from_id}"
-        node_data = self.mesh_service.get_node_info(from_id)
+        node_data = self.db.get_node(from_id)
         if node_data != None:
             if node_data.long_name != None:
                 sender = f"{node_data.long_name}"
