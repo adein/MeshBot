@@ -1,18 +1,24 @@
 from abc import ABC, abstractmethod
 import logging
 
+from core.database import Database
+from core.event_bus import EventBus
+from services.meshtastic_service import MeshtasticService
+
+
 class BotModule(ABC):
     """
-    The contract that all modules must follow.
+    Abstract base class for bot modules.
     """
-    def __init__(self, name, config, global_services, my_node=None):
-        self.name = name
+
+    def __init__(self, name: str, config, global_services: dict, my_node: str):
+        self.name: str = name
         self.config = config
-        self.services = global_services
-        self.my_node_id = my_node
-        self.db = self.services.get('db')
-        self.event_bus = self.services.get('bus')
-        self.mesh_service = self.services.get('mesh')
+        self.services: dict = global_services
+        self.my_node_id: str = my_node
+        self.db: Database = self.services.get('db')
+        self.event_bus: EventBus = self.services.get('bus')
+        self.mesh_service: MeshtasticService = self.services.get('mesh')
         self.logger = logging.getLogger(name)
 
     @abstractmethod
@@ -20,7 +26,14 @@ class BotModule(ABC):
         """
         The logic to run on the schedule.
         """
+        # Do nothing in the abstract class
         pass
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
+        """
+        Check if the module is enabled in the configuration.
+
+        :return: True if enabled, False otherwise
+        :rtype: bool
+        """
         return self.config.get('enabled', False)

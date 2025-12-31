@@ -1,7 +1,9 @@
 # main.py updates
 import logging
-import yaml
 import sys
+
+import yaml
+
 from core.command_dispatcher import CommandDispatcher
 from core.database import Database
 from core.event_bus import EventBus
@@ -11,13 +13,18 @@ from services.meshtastic_service import MeshtasticService
 from ui.dashboard import BotDashboard
 from ui.log_handler import TextualLogHandler
 
+
 def load_config():
+    """
+    Load configuration from config.yaml file.
+    """
     try:
         with open("config.yaml", "r") as f:
             return yaml.safe_load(f)
     except FileNotFoundError:
         print("config.yaml not found. Exiting.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     # Load Config
@@ -28,16 +35,22 @@ if __name__ == "__main__":
         filename='bot_activity.log',
         filemode='w'
     )
-    my_node_id = config['core'].get('my_node_id', 'ERROR')
+    my_node_id: str = config['core'].get('my_node_id', 'ERROR')
 
     # Initialize Global Components
     event_bus = EventBus()
-    db = Database(event_bus, config.get('core', {}).get('database', {}))
-    meshtastic_service = MeshtasticService(event_bus, db, config.get('services', {}).get('meshtastic_service', {}))
+    db = Database(event_bus, config.get(
+        'core', {}).get('database', {}))
+    meshtastic_service = MeshtasticService(
+        event_bus,
+        db,
+        config.get('services', {}).get('meshtastic_service', {}),
+        my_node_id
+    )
     global_services = {
         "bus": event_bus,
         "db": db,
-        "mesh": meshtastic_service 
+        "mesh": meshtastic_service
     }
     # Connect
     db.connect()
@@ -45,13 +58,12 @@ if __name__ == "__main__":
 
     # Initialize Core Components
     plugin_mgr = PluginManager(
-        modules_dir="./modules",
         config=config,
         global_services=global_services,
         my_node=my_node_id,
     )
     scheduler = BotScheduler(plugin_manager=plugin_mgr)
-    dispatcher = CommandDispatcher(global_services, commands_dir="./commands", my_node=my_node_id)
+    dispatcher = CommandDispatcher(global_services, my_node=my_node_id)
     dispatcher.load_commands()
     dispatcher.start()
 
@@ -63,7 +75,7 @@ if __name__ == "__main__":
     # Start Dashboard UI
     app = BotDashboard(plugin_mgr, scheduler, event_bus)
     try:
-        app.run() # This blocks and takes over the terminal
+        app.run()  # This blocks and takes over the terminal
     except KeyboardInterrupt:
         print("\nForce closing...")
     finally:

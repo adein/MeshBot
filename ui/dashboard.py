@@ -1,19 +1,22 @@
+import logging
 from datetime import datetime
+
+import yaml
 from rich.table import Table
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, RichLog, Static
-from textual.containers import Container
+from textual.widgets import Header, Footer, Input, RichLog
 from textual import events, on
-import logging
-import yaml
 
+from core.event_bus import EventBus
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
 from ui.log_handler import TextualLogHandler
 from utils.geo_utils import get_city_state_offline
-from utils.geo_utils import get_city_state_online
+
 
 class BotDashboard(App):
+    """Textual-based TUI Dashboard for MeshBot."""
+
     CSS = """
     Screen {
         layout: grid;
@@ -47,13 +50,17 @@ class BotDashboard(App):
     }
     """
 
-    def __init__(self, plugin_mgr, scheduler, event_bus):
+    def __init__(self, plugin_mgr: PluginManager, scheduler: BotScheduler, event_bus: EventBus):
         super().__init__()
-        self.plugin_mgr = plugin_mgr
-        self.scheduler = scheduler
-        self.event_bus = event_bus
-        self.command_history = []
-        self.history_index = 0
+        self.plugin_mgr: PluginManager = plugin_mgr
+        self.scheduler: BotScheduler = scheduler
+        self.event_bus: EventBus = event_bus
+        self.console_output: RichLog = RichLog(
+            highlight=True, markup=True, max_lines=1000, id="console_output")
+        self.system_log: RichLog = RichLog(
+            highlight=True, markup=True, max_lines=1000, id="system_log")
+        self.command_history: list[str] = []
+        self.history_index: int = 0
 
     def _load_config(self):
         try:
@@ -61,21 +68,19 @@ class BotDashboard(App):
                 return yaml.safe_load(f)
         except FileNotFoundError:
             logging.error("config.yaml not found!")
-            self.console_output.write(f"[bold red]config.yaml not found!")
+            self.console_output.write("[bold red]config.yaml not found!")
             self.exit()
 
     def compose(self) -> ComposeResult:
         """Create the UI layout."""
         yield Header(show_clock=True)
-        
-        self.system_log = RichLog(highlight=True, markup=True, id="system_log")
+
         self.system_log.border_title = "System Activity"
         yield self.system_log
-        
-        self.console_output = RichLog(highlight=True, markup=True, id="console_output")
+
         self.console_output.border_title = "Command Output"
         yield self.console_output
-        
+
         yield Input(placeholder="Type a command...", id="command_input")
         yield Footer()
 
@@ -87,15 +92,16 @@ class BotDashboard(App):
         handler.setFormatter(formatter)
         root_logger = logging.getLogger()
         root_logger.addHandler(handler)
-        self.console_output.write("[bold green]Welcome to the MeshBot admin console. Type help or ? to list commands.[/]")
+        self.console_output.write(
+            "[bold green]Welcome to the MeshBot admin console. Type help or ? to list commands.[/]")
         self.console_output.write("[bold yellow]Admin Console Ready.[/]")
         self.query_one("#command_input").focus()
 
     @on(Input.Submitted, "#command_input")
     def handle_input(self, event: Input.Submitted):
         """Runs when user presses Enter."""
-        command = event.value.strip()
-        self.query_one("#command_input").value = "" # Clear input
+        command: str = event.value.strip()
+        self.query_one("#command_input").value = ""  # Clear input
 
         if not command:
             return
@@ -128,46 +134,58 @@ class BotDashboard(App):
                     input_widget.cursor_position = len(input_widget.value)
             event.stop()
 
-    def process_command(self, cmd_text):
+    def process_command(self, cmd_text: str):
         """
-        Console commands.
+        Process a command entered by the administrator.
+
+        :param cmd_text: The full command text entered.
+        :type cmd_text: str
         """
         parts = cmd_text.split()
-        base = parts[0].lower()
-        args = parts[1] if len(parts) > 1 else None
+        base = parts[0].lower().removeprefix("!")
+        args = parts[1:] if len(parts) > 1 else None
 
         if base == "exit":
             self.exit()
-        
+
         elif base == "help" or base == "?":
             self.console_output.write("[bold]Available Commands:[/]")
             self.console_output.write("  [cyan]exit[/]: Exit the bot.")
-            self.console_output.write("  [cyan]help or ?[/]: Show this help message.")
-            self.console_output.write("  [cyan]node_search[/]: Search the node database.")
-            self.console_output.write("  [cyan]reload[/]: Reload configuration and modules.")
-            self.console_output.write("  [cyan]stats[/]: Show bot and mesh stats.")
-            self.console_output.write("  [cyan]status[/]: Show status of all modules.")
-            self.console_output.write("  [cyan]toggle <module_name>[/]: Enable/Disable a module.")
-            
+            self.console_output.write(
+                "  [cyan]help or ?[/]: Show this help message.")
+            self.console_output.write(
+                "  [cyan]node_search[/]: Search the node database.")
+            self.console_output.write(
+                "  [cyan]reload[/]: Reload configuration and modules.")
+            self.console_output.write(
+                "  [cyan]stats[/]: Show bot and mesh stats.")
+            self.console_output.write(
+                "  [cyan]status[/]: Show status of all modules.")
+            self.console_output.write(
+                "  [cyan]toggle <module_name>[/]: Enable/Disable a module.")
+
         elif base == "node_search":
             if not args:
-                self.console_output.write("[red]Usage: node_search <name or id>[/]")
+                self.console_output.write(
+                    "[red]Usage: node_search <name or id>[/]")
                 return
 
             # Access the DB Service via the Plugin Manager's registry
             db = self.plugin_mgr.services.get('db')
             if not db:
-                self.console_output.write("[bold red]Error: Database Service not loaded.[/]")
+                self.console_output.write(
+                    "[bold red]Error: Database Service not loaded.[/]")
                 return
 
-            clean_args = args.strip()
-            self.console_output.write(f"Searching for: [bold cyan]'{clean_args}'[/]...")
+            clean_args = ' '.join(args)
+            self.console_output.write(
+                f"Searching for: [bold cyan]'{clean_args}'[/]...")
             results = db.search_nodes(clean_args, limit=20)
 
             if not results:
-                self.console_output.write("[yellow]No matching nodes found.[/]")
+                self.console_output.write(
+                    "[yellow]No matching nodes found.[/]")
             else:
-                #SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
                 # Create a pretty table
                 table = Table(title=f"Search Results ({len(results)})")
                 table.add_column("Node ID", style="cyan")
@@ -198,7 +216,7 @@ class BotDashboard(App):
                     raw_mqtt = row[9]
                     channel = str(row[10]) if row[10] is not None else "N/A"
                     hops = str(row[11]) if row[11] is not None else "N/A"
-                    raw_last_seen = row[12] 
+                    raw_last_seen = row[12]
                     raw_unmessagable = row[13]
 
                     if lat and lon:
@@ -218,9 +236,9 @@ class BotDashboard(App):
                         unmessagable = "True"
                     else:
                         unmessagable = "False"
-                    
 
-                    table.add_row(node_id, long_name, short_name, hw_model, role, location_str, altitude, snr, mqtt, channel, hops, unmessagable, last_seen_str)
+                    table.add_row(node_id, long_name, short_name, hw_model, role, location_str,
+                                  altitude, snr, mqtt, channel, hops, unmessagable, last_seen_str)
 
                 # Render the table to the console window
                 self.console_output.write(table)
@@ -238,20 +256,23 @@ class BotDashboard(App):
 
         elif base == "stats":
             if not args:
-                self.console_output.write("[red]Usage: stats <channels|commands|users>[/]")
+                self.console_output.write(
+                    "[red]Usage: stats <channels|commands|users>[/]")
                 return
             db = self.plugin_mgr.services.get('db')
             if not db:
-                self.console_output.write("[bold red]Error: Database Service not loaded.[/]")
+                self.console_output.write(
+                    "[bold red]Error: Database Service not loaded.[/]")
                 return
             mesh = self.plugin_mgr.services.get('mesh')
             if not mesh:
-                self.console_output.write("[bold red]Error: Meshtastic Service not loaded.[/]")
+                self.console_output.write(
+                    "[bold red]Error: Meshtastic Service not loaded.[/]")
                 return
-            clean_args = args.strip()
+            clean_args = args[0].lower()
             if clean_args == "channels":
                 rows = db.get_channel_usage()
-                table = Table(title=f"Channel Usage")
+                table = Table(title="Channel Usage")
                 table.add_column("Channel", style="cyan")
                 table.add_column("Messages", style="green")
                 for row in rows:
@@ -261,7 +282,7 @@ class BotDashboard(App):
                 self.console_output.write(table)
             elif clean_args == "commands":
                 rows = db.get_top_commands(limit=10)
-                table = Table(title=f"Bot Command Usage")
+                table = Table(title="Bot Command Usage")
                 table.add_column("Command", style="cyan")
                 table.add_column("Invocations", style="green")
                 for row in rows:
@@ -271,14 +292,14 @@ class BotDashboard(App):
                 self.console_output.write(table)
             elif clean_args == "users":
                 rows = db.get_top_talkers(limit=20)
-                table = Table(title=f"Top Talkers")
+                table = Table(title="Top Talkers")
                 table.add_column("User", style="cyan")
                 table.add_column("Channel", style="green")
                 table.add_column("Count", style="red")
                 for row in rows:
                     if row[0] is not None:
                         user_id = str(row[0])
-                        user_info = mesh.get_node_info(user_id)
+                        user_info = db.get_node(user_id)
                         if user_info is not None and user_info.long_name:
                             user_id = f"{user_info.long_name} ({user_id})"
                     else:
@@ -293,7 +314,8 @@ class BotDashboard(App):
                     table.add_row(user_id, channel, count)
                 self.console_output.write(table)
             else:
-                self.console_output.write("[red]Usage: stats <channels|commands|users>[/]")
+                self.console_output.write(
+                    "[red]Usage: stats <channels|commands|users>[/]")
 
         elif base == "status":
             self.console_output.write("--- STATUS REPORT ---")
@@ -301,16 +323,19 @@ class BotDashboard(App):
                 status = "[green]ENABLED[/]" if mod.is_enabled() else "[red]DISABLED[/]"
                 self.console_output.write(f"{status} {name}")
             self.console_output.write("---------------------")
-        
+
         elif base == "toggle" and args:
-            mod = self.plugin_mgr.get_module(args)
+            module_name = args[0]
+            mod = self.plugin_mgr.get_module(module_name)
             if mod:
                 mod.config['enabled'] = not mod.config['enabled']
                 state = "Enabled" if mod.config['enabled'] else "Disabled"
-                self.console_output.write(f"Module {args} is now {state}")
+                self.console_output.write(
+                    f"Module {module_name} is now {state}")
                 self.scheduler.reload_jobs()
             else:
-                self.console_output.write(f"[bold red]Module {args} not found.[/]")
+                self.console_output.write(
+                    f"[bold red]Module {module_name} not found.[/]")
 
         else:
             self.console_output.write(f"[yellow]Unknown command: {base}[/]")

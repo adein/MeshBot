@@ -1,90 +1,116 @@
+from __future__ import annotations
+
 import os
 import importlib.util
 import logging
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from core.event_bus import EventBus
 from interfaces.bot_command import BotCommand
+from services.meshtastic_service import TEXT_MESSAGE_TOPIC
+
+if TYPE_CHECKING:
+    from services.meshtastic_service import TextPacket
+
+COMMANDS_DIR = "./commands"
+
 
 @dataclass
 class CommandData:
-    __slots__ = ['sender_id', 'receiver_id', 'parameters', 'raw_message', 'channel', 'rx_time', 'rx_snr', 'hops_away', 'via_mqtt']
+    """
+    Data class to hold command information.
+    """
+    __slots__ = ['sender_id', 'receiver_id', 'parameters', 'raw_message',
+                 'channel', 'rx_time', 'rx_snr', 'hops_away', 'via_mqtt']
     sender_id: str
     receiver_id: str
-    parameters: [str]
+    parameters: list[str] | None
     raw_message: str
-    channel: int
+    channel: int | None
     rx_time: int
-    rx_snr: float
-    hops_away: int
+    rx_snr: float | None
+    hops_away: int | None
     via_mqtt: bool
 
+
 class CommandDispatcher:
-    def __init__(self, global_services, commands_dir="./commands", my_node=None):
+    """
+    Command Dispatcher to load and handle bot commands.
+    """
+
+    def __init__(self, global_services: dict, my_node: str):
         self.services = global_services
-        self.commands_dir = commands_dir
-        self.my_node_id = my_node
-        self.event_bus = self.services.get('bus')
-        self.registry = {} 
+        self.commands_dir = COMMANDS_DIR
+        self.my_node_id: str = my_node
+        self.event_bus: EventBus = self.services.get('bus')
+        self.registry: dict[str, BotCommand] = {}
         self.logger = logging.getLogger("Core.CommandDispatcher")
 
     def load_commands(self):
+        """
+        Load command modules from the commands directory.
+        """
         if not os.path.exists(self.commands_dir):
             os.makedirs(self.commands_dir)
-
-        self.logger.info(f"Loading commands from {self.commands_dir}...")
-        
+        self.logger.info("Loading commands from %s... ", self.commands_dir)
         for filename in os.listdir(self.commands_dir):
             if filename.endswith(".py") and not filename.startswith("__"):
                 self._load_file(filename)
 
-    def _load_file(self, filename):
+    def _load_file(self, filename: str):
         module_name = filename[:-3]
         file_path = os.path.join(self.commands_dir, filename)
-        
+
         try:
-            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            spec = importlib.util.spec_from_file_location(
+                module_name, file_path)
             py_mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(py_mod)
-
             for attr_name in dir(py_mod):
                 attr = getattr(py_mod, attr_name)
-                
-                # 1. Must be a class subclassing BotCommand
-                if (isinstance(attr, type) and 
-                    issubclass(attr, BotCommand) and 
-                    attr is not BotCommand):
-                    
-                    # Instantiate
+                # Must be a class subclassing BotCommand
+                if (isinstance(attr, type) and
+                    issubclass(attr, BotCommand) and
+                        attr is not BotCommand):
                     cmd_instance = attr()
-                    
-                    # 2. Validate the attributes are strings
+                    # Validate the attributes are strings
                     if not isinstance(cmd_instance.trigger, str) or not isinstance(cmd_instance.event_topic, str):
-                        self.logger.warning(f"Skipping {attr_name}: 'trigger' or 'event_topic' is not a string.")
+                        self.logger.warning(
+                            "Skipping %s: 'trigger' or 'event_topic' is not a string.", attr_name)
                         continue
-
                     # Register
                     self.registry[cmd_instance.trigger] = cmd_instance
-                    self.logger.info(f"Registered command '!{cmd_instance.trigger}' -> {cmd_instance.event_topic}")
+                    self.logger.info(
+                        "Registered command '!%s' -> %s", cmd_instance.trigger, cmd_instance.event_topic)
 
         except Exception as e:
-            self.logger.error(f"Failed to load command file {filename}: {e}", exc_info=True)
+            self.logger.error(
+                "Failed to load command file %s: %s", filename, e, exc_info=True)
 
     def start(self):
-        self.event_bus.subscribe("meshtastic.text_message", self.handle_message)
+        """
+        Start the command dispatcher by subscribing to the event bus.
+        """
+        self.event_bus.subscribe(TEXT_MESSAGE_TOPIC, self.handle_message)
         self.logger.info("Command Dispatcher started.")
 
-    def handle_message(self, packet):
+    def handle_message(self, packet: TextPacket):
+        """
+        Handle incoming text messages and dispatch commands if recognized.
+
+        :param packet: The incoming text message.
+        :type packet: TextPacket
+        """
         text = packet.message.strip()
         if not text or not text.startswith('!'):
             return
-
         parts = text.split()
-        trigger_word = parts[0][1:] 
-        
+        trigger_word = parts[0][1:]
         command = self.registry.get(trigger_word)
-        
         if command:
-            self.logger.info(f"Command recognized: !{trigger_word}")
+            self.logger.info("Command recognized: !%s", trigger_word)
             sender_id = packet.sender_id
             db = self.services.get('db')
             if db:
@@ -99,7 +125,7 @@ class CommandDispatcher:
             rx_snr = packet.rx_snr
             via_mqtt = packet.via_mqtt
             hops_away = None
-            if packet.hop_start != None and packet.hop_limit != None:
+            if packet.hop_start is not None and packet.hop_limit is not None:
                 hops_away = packet.hop_start - packet.hop_limit
             data = CommandData(
                 sender_id,
@@ -114,4 +140,4 @@ class CommandDispatcher:
             )
             self.event_bus.publish(command.event_topic, data)
         else:
-            self.logger.info(f"Unknown command: !{trigger_word}")
+            self.logger.info("Unknown command: !%s", trigger_word)
