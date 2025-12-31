@@ -56,9 +56,9 @@ class BotDashboard(App):
         self.scheduler: BotScheduler = scheduler
         self.event_bus: EventBus = event_bus
         self.console_output: RichLog = RichLog(
-            highlight=True, markup=True, id="console_output")
+            highlight=True, markup=True, max_lines=1000, id="console_output")
         self.system_log: RichLog = RichLog(
-            highlight=True, markup=True, id="system_log")
+            highlight=True, markup=True, max_lines=1000, id="system_log")
         self.command_history: list[str] = []
         self.history_index: int = 0
 
