@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from core.event_bus import EventBus
 from interfaces.bot_command import BotCommand
+from services.meshtastic_service import TEXT_MESSAGE_TOPIC
 
 if TYPE_CHECKING:
     from services.meshtastic_service import TextPacket
@@ -92,8 +93,7 @@ class CommandDispatcher:
         """
         Start the command dispatcher by subscribing to the event bus.
         """
-        self.event_bus.subscribe(
-            "meshtastic.text_message", self.handle_message)
+        self.event_bus.subscribe(TEXT_MESSAGE_TOPIC, self.handle_message)
         self.logger.info("Command Dispatcher started.")
 
     def handle_message(self, packet: TextPacket):

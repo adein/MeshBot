@@ -188,7 +188,7 @@ class Database:
         try:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.execute(
-                "SELECT * FROM nodes WHERE node_id = ?", (node_id))
+                "SELECT * FROM nodes WHERE node_id = ?", (node_id,))
             row = cursor.fetchone()
             if row:
                 return NodeInfo(**dict(row))
@@ -297,7 +297,7 @@ class Database:
                    OR lower(node_id) LIKE ?
                    OR lower(hardware) LIKE ?
                 LIMIT ?
-            ''', (wildcard_query, wildcard_query, wildcard_query, wildcard_query, limit))
+            ''', (wildcard_query, wildcard_query, wildcard_query, wildcard_query, limit,))
             return cursor.fetchall()
         except Exception as e:
             self.logger.error("Search failed: %s", e, exc_info=True)
