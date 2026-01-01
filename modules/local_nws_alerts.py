@@ -19,10 +19,9 @@ class NwsAlertChecker(BotModule):
     def execute(self):
         zone: str = self.config.get('zone', None)
         if zone is None:
-            self.logger.warning(
+            self.logger.error(
                 "NWS Alert Checker missing required zone configuration!")
             return
-        self.logger.info("Fetching weather alerts for zone %s...", zone)
         data: list[WeatherAlert] | None = self.api_service.get_alerts(zone)
         if data is None or len(data) <= 0:
             # No alerts

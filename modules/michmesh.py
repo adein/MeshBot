@@ -24,10 +24,8 @@ class MichMesh(BotModule):
     def _handle_command(self, data: CommandData):
         if not self.is_enabled():
             return
-        self.logger.info(
-            "EVENT TRIGGERED: received michmesh command with payload: %s", data)
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.info(
+            self.logger.warning(
                 "MichMesh command is missing essential message data")
             return
         self.mesh_service.send_reply(INFO, data)
