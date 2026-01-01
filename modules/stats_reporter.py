@@ -9,6 +9,14 @@ class StatsReporter(BotModule):
 
     def __init__(self, name: str, config, global_services: dict, my_node: str):
         super().__init__(name, config, global_services, my_node)
+        self.channel_0_name: str = self.config.get('channel_0_name', '0')
+        self.channel_1_name: str = self.config.get('channel_1_name', '1')
+        self.channel_2_name: str = self.config.get('channel_2_name', '2')
+        self.channel_3_name: str = self.config.get('channel_3_name', '3')
+        self.channel_4_name: str = self.config.get('channel_4_name', '4')
+        self.channel_5_name: str = self.config.get('channel_5_name', '5')
+        self.channel_6_name: str = self.config.get('channel_6_name', '6')
+        self.channel_7_name: str = self.config.get('channel_7_name', '7')
         if self.event_bus:
             self.event_bus.subscribe(
                 "bot.command.stats", self.handle_stats_request)
@@ -58,7 +66,25 @@ class StatsReporter(BotModule):
             rows = self.db.get_channel_usage()
             output.append("📻 Channel Usage:")
             for channel, count in rows:
-                output.append(f"Ch {channel}: {count} msgs")
+                if channel == 0:
+                    channel_name = self.channel_0_name
+                elif channel == 1:
+                    channel_name = self.channel_1_name
+                elif channel == 2:
+                    channel_name = self.channel_2_name
+                elif channel == 3:
+                    channel_name = self.channel_3_name
+                elif channel == 4:
+                    channel_name = self.channel_4_name
+                elif channel == 5:
+                    channel_name = self.channel_5_name
+                elif channel == 6:
+                    channel_name = self.channel_6_name
+                elif channel == 7:
+                    channel_name = self.channel_7_name
+                else:
+                    channel_name = f"{channel}"
+                output.append(f"{channel_name}: {count} msgs")
 
         else:
             output.append("Usage: !stats [commands|users|channels]")
