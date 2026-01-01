@@ -41,22 +41,22 @@ class Ping(BotModule):
                 sender = f"{node_data.short_name}"
         message = f"Pong @{sender}!"
         if via_mqtt is True:
-            message = message + " Heard via MQTT."
+            message = message + " Heard via MQTT 🛜."
         else:
-            message = message + " Heard via LoRa radio."
-        if snr is not None or (node_data is not None and node_data.snr is not None) or hops_away is not None or (node_data is not None and node_data.hops_away is not None):
-            message = message + "\n"
-            spacer = ""
-            if snr is not None:
-                message = message + spacer + f"SNR: {snr}"
-                spacer = ", "
-            elif node_data is not None and node_data.snr is not None:
-                message = message + spacer + \
-                    f"Previously observed SNR: {node_data.snr}"
-                spacer = ", "
-            if hops_away is not None:
-                message = message + spacer + f"Hops away: {hops_away}"
-            elif node_data is not None and node_data.hops_away is not None:
-                message = message + spacer + \
-                    f"Previously observed hops away: {node_data.hops_away}"
+            message = message + " Heard via LoRa 📡."
+            if snr is not None or (node_data is not None and node_data.snr is not None) or hops_away is not None or (node_data is not None and node_data.hops_away is not None):
+                message = message + "\n"
+                spacer = ""
+                if snr is not None:
+                    message = message + spacer + f"SNR: {snr}"
+                    spacer = ", "
+                elif node_data is not None and node_data.snr is not None:
+                    message = message + spacer + \
+                        f"Previously observed SNR: {node_data.snr}"
+                    spacer = ", "
+                if hops_away is not None:
+                    message = message + spacer + f"Hops away: {hops_away}"
+                elif node_data is not None and node_data.hops_away is not None:
+                    message = message + spacer + \
+                        f"Previously observed hops away: {node_data.hops_away}"
         self.mesh_service.send_reply(message, data)

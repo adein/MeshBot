@@ -2,9 +2,9 @@ from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
 
 
-GENERAL_HELP = "General commands: !about, !michmesh, !nodesearch {query}, !ping, !stats {type}"
-WEATHER_HELP = "Weather commands: !alerts {location}, !forecast {location}, !weather {location}"
-HELP_ERROR = 'Unknown command. Try "!help" or "!help command"'
+GENERAL_HELP = "🔧 General commands: !about, !michmesh, !nodesearch {query}, !ping, !stats {type}"
+WEATHER_HELP = "🌤️ Weather commands: !alerts {location}, !forecast {location}, !weather {location}"
+HELP_ERROR = '❗️ Unknown command. Try "!help" or "!help command"'
 
 ABOUT_CMD_HELP = 'Get information about this bot or how to get in contact with the owner'
 MICHMESH_CMD_HELP = 'Get information about configuring your meshtastic node to talk with \

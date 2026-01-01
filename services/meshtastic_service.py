@@ -25,7 +25,6 @@ if TYPE_CHECKING:
 CONNECTION_STATUS_TOPIC = "meshtastic_service.connection_status"
 NODE_UPDATE_TOPIC = "meshtastic_service.node_update"
 TEXT_MESSAGE_TOPIC = "meshtastic_service.text_message"
-TO_SEND_TOPIC = "meshtastic_service.to_send"
 
 
 @dataclass
@@ -100,8 +99,6 @@ class MeshtasticService(BotService):
                       "meshtastic.receive.position")
         pub.subscribe(self._on_receive_text_packet, "meshtastic.receive.text")
         pub.subscribe(self._on_receive_user_packet, "meshtastic.receive.user")
-        # Subscribe to internal event bus for outgoing messages
-        self.event_bus.subscribe(TO_SEND_TOPIC, self._on_receive_text_to_send)
 
     def connect(self):
         """
@@ -189,13 +186,11 @@ class MeshtasticService(BotService):
         self.logger.debug("Send text message: %s to channel: %d, node: %s",
                           text, to_channel_number, to_node_id)
         if text is None or (to_node_id is None and to_channel_number is None):
-            return None
-        text_to_send = text[:200]
+            return
         if to_node_id is not None:
-            return self.interface.sendText(text=text_to_send, destinationId=to_node_id)
+            self._send_text_to_node(text, to_node_id)
         elif to_channel_number is not None:
-            return self.interface.sendText(text=text_to_send, channelIndex=to_channel_number)
-        return None
+            self._send_text_to_channel(text, to_channel_number)
 
     def send_alert(self, text: str, to_node_id: str | None = None, to_channel_number: int | None = None):
         """
@@ -213,13 +208,11 @@ class MeshtasticService(BotService):
         self.logger.debug("Send text alert: %s to channel: %d, node: %s",
                           text, to_channel_number, to_node_id)
         if text is None or (to_node_id is None and to_channel_number is None):
-            return None
-        text_to_send = text[:200]
+            return
         if to_node_id is not None:
-            return self.interface.sendAlert(text=text_to_send, destinationId=to_node_id)
+            self._send_alert_to_node(text, to_node_id)
         elif to_channel_number is not None:
-            return self.interface.sendAlert(text=text_to_send, channelIndex=to_channel_number)
-        return None
+            self._send_alert_to_channel(text, to_channel_number)
 
     def send_reply(self, reply: str, command_data: CommandData) -> bool:
         """
@@ -235,45 +228,109 @@ class MeshtasticService(BotService):
         if command_data.sender_id is not None and command_data.receiver_id == self.my_node_id:
             self.logger.debug("Send reply: %s, to node: %s",
                               reply, command_data.sender_id)
-            self.send_text(reply, to_node_id=command_data.sender_id)
+            self._send_text_to_node(reply, command_data.sender_id)
             return True
         elif command_data.channel is not None and command_data.receiver_id == "^all":
             self.logger.debug("Send reply: %s, to channel: %d",
                               reply, command_data.channel)
-            self.send_text(reply, to_channel_number=command_data.channel)
+            self._send_text_to_channel(reply, command_data.channel)
             return True
         else:
             self.logger.warning(
                 "Unable to send reply! Make sure your node ID is set correctly in config.")
         return False
 
-    def _on_receive_text_to_send(self, data: TextToSend):
-        # Called when a text message to send has been received internally from the event bus
-        self.logger.debug(
-            "Received a text message to send with data: %s", data)
-        if not self.connected:
-            self.logger.warning("Disconnected! Unable to send text message")
-            return
-        text = data.text
-        to_node_id = data.to_node_id
-        to_channel_number = data.to_channel_number
-        is_alert = data.is_alert
-        if is_alert is True:
-            if to_node_id is not None:
-                self.send_alert(text, to_node_id=to_node_id)
-            elif to_channel_number is not None:
-                self.send_alert(text, to_channel_number=to_channel_number)
+    def _send_alert_to_channel(self, alert: str, channel: int):
+        """
+        Sends an alert to a channel, truncating if necessary to keep it to a single alert.
+
+        :param alert: The alert to send
+        :type alert: str
+        :param channel: The channel number to send the alert to
+        :type channel: int
+        """
+        alert_to_send = self._truncate_by_bytes(alert, 200)
+        self.interface.sendAlert(text=alert_to_send, channelIndex=channel)
+
+    def _send_alert_to_node(self, alert: str, node_id: str):
+        """
+        Sends an alert to a node, splitting the alert if necessary to keep each part within size limits.
+
+        :param alert: The alert to send
+        :type alert: str
+        :param node_id: The destination node ID
+        :type node_id: str
+        """
+        # Split the alert if necessary, sending up to 5 parts
+        alert_chunks = self._split_text_by_bytes(alert, limit=200)[:5]
+        for chunk in alert_chunks:
+            self.interface.sendAlert(text=chunk, destinationId=node_id)
+
+    def _send_text_to_channel(self, message: str, channel: int):
+        """
+        Sends a message to a channel, truncating if necessary to keep it to a single message.
+
+        :param message: The message to send
+        :type message: str
+        :param channel: The channel number to send the message to
+        :type channel: int
+        """
+        message_to_send = self._truncate_by_bytes(message, 200)
+        self.interface.sendText(text=message_to_send, channelIndex=channel)
+
+    def _send_text_to_node(self, message: str, node_id: str):
+        """
+        Sends a message to a node, splitting the message if necessary to keep each part within size limits.
+
+        :param message: The message to send
+        :type message: str
+        :param node_id: The destination node ID
+        :type node_id: str
+        """
+        # Split the message if necessary, sending up to 5 parts
+        message_chunks = self._split_text_by_bytes(message, limit=200)[:5]
+        for chunk in message_chunks:
+            self.interface.sendText(text=chunk, destinationId=node_id)
+
+    def _truncate_by_bytes(self, text, max_bytes):
+        encoded = text.encode('utf-8')
+        truncated_bytes = encoded[:max_bytes]
+        return truncated_bytes.decode('utf-8', 'ignore')
+
+    def _split_text_by_bytes(self, text, limit=200):
+        chunks = []
+        # Strict priority order: Newlines > Semicolons > Commas
+        # Split on the first one of these types found in the chunk
+        priority_delimiters = ["\n", ";", ","]
+        while text:
+            # Get the max safe chunk (hard limit)
+            candidate = text[:limit]
+            encoded = candidate.encode('utf-8')
+            # Ensure we don't break multi-byte chars (emojis)
+            sliced_encoded = encoded[:limit]
+            valid_chunk = sliced_encoded.decode('utf-8', 'ignore')
+            # If the valid_chunk takes the rest of the text, just take it all.
+            if len(valid_chunk) == len(text):
+                chunks.append(valid_chunk)
+                break
+            best_split_index = -1
+            for delimiter in priority_delimiters:
+                # Find the LAST occurrence of this specific delimiter
+                idx = valid_chunk.rfind(delimiter)
+                if idx != -1:
+                    # We found a delimiter of this priority
+                    # We accept this split immediately and stop looking for lower priority ones
+                    best_split_index = idx
+                    break
+            if best_split_index != -1:
+                # Split AFTER the delimiter (keep \n or , attached to the chunk)
+                final_chunk = valid_chunk[:best_split_index + 1]
             else:
-                self.logger.warning(
-                    "Unable to send message - missing destination data!")
-        else:
-            if to_node_id is not None:
-                self.send_text(text, to_node_id=to_node_id)
-            elif to_channel_number is not None:
-                self.send_text(text, to_channel_number=to_channel_number)
-            else:
-                self.logger.warning(
-                    "Unable to send message - missing destination data!")
+                # No delimiters found - Fall back to the hard byte cut
+                final_chunk = valid_chunk
+            chunks.append(final_chunk)
+            text = text[len(final_chunk):]
+        return chunks
 
     def _is_duplicate(self, msg_hash: str) -> bool:
         """

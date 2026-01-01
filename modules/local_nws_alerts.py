@@ -66,8 +66,8 @@ class NwsAlertChecker(BotModule):
     def _process_alert(self, alert: WeatherAlert):
         self.logger.info("Processing alert: %s", alert)
         self.previous_alert_id = alert.alert_id
-        summary_string = "NWS Weather Alert (" + \
-            alert.severity + "): " + alert.headline
+        severity_emoji = self._get_severity_emoji(alert.severity)
+        summary_string = "NWS Weather Alert " + severity_emoji + ": " + alert.headline
         area_string = "Areas: " + alert.areas
         description = self._process_description(alert.description)
         remaining_size = 200 - len(summary_string) - 1
@@ -97,3 +97,16 @@ class NwsAlertChecker(BotModule):
             "* ADDITIONAL DETAILS...", "")
         new_description = new_description.replace("\n\n", "\n")
         return new_description
+
+    def _get_severity_emoji(self, severity: str) -> str:
+        severity_lower = severity.lower()
+        if severity_lower == "extreme" or severity_lower == "urgent":
+            return "🚨"
+        elif severity_lower == "severe" or severity_lower == "high" or severity_lower == "major":
+            return "️❗️"
+        elif severity_lower == "moderate":
+            return "⚠️"
+        elif severity_lower == "minor":
+            return "ℹ️"
+        else:
+            return f"({severity})"
