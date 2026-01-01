@@ -571,7 +571,6 @@ class MeshtasticService(BotService):
             via_mqtt,
             receiver_id != '^all'
         )
-        self.event_bus.publish(TEXT_MESSAGE_TOPIC, text_packet)
         if node_id is not None and node_id != '':
             current_info = self.db.get_node(node_id)
             if current_info is None:
@@ -589,3 +588,4 @@ class MeshtasticService(BotService):
                 if current_info.last_heard is None or (rx_time > current_info.last_heard):
                     current_info.last_heard = rx_time
             self.db.update_node(current_info)
+        self.event_bus.publish(TEXT_MESSAGE_TOPIC, text_packet)
