@@ -94,6 +94,7 @@ class NwsWeatherService:
         :return: The NWS zone ID or None if not found
         :rtype: str | None
         """
+        self.logger.debug("Get zone with: %f, %f", latitude, longitude)
         if latitude is None or longitude is None:
             return None
         url = f"{BASE_URL}/{POINTS_PATH}/{latitude},{longitude}"
@@ -136,6 +137,7 @@ class NwsWeatherService:
         :return: A list of active WeatherAlert objects or None if no alerts are found
         :rtype: list[WeatherAlert] | None
         """
+        self.logger.debug("Get alerts for zone: %s", zone)
         url = f"{BASE_URL}/{ALERTS_PATH}/{zone}"
 
         try:
@@ -144,9 +146,11 @@ class NwsWeatherService:
 
             data = response.json()
             if 'features' not in data:
+                self.logger.warning("Get alerts missing 'features'")
                 return None
             alerts_features = data['features']
             if len(alerts_features) <= 0:
+                self.logger.warning("Get alerts features is empty")
                 return None
             # At least one alert
             alerts = []
@@ -161,12 +165,14 @@ class NwsWeatherService:
                 parameters = properties['parameters']
                 headline = parameters['NWSheadline'][0].capitalize()
                 if alert_id is None or expires is None or severity is None or headline is None:
+                    self.logger.debug("Alert is missing required fields")
                     continue
                 expires_dt = datetime.fromisoformat(expires)
                 timestamp_utc = expires_dt.astimezone(timezone.utc)
                 now_utc = datetime.now(timezone.utc)
                 if now_utc > timestamp_utc:
                     # Alert is expired
+                    self.logger.debug("Alert is expired")
                     continue
                 alert = WeatherAlert(
                     alert_id, timestamp_utc, severity, headline, description, event, areas)
@@ -190,6 +196,7 @@ class NwsWeatherService:
         :return: The current WeatherConditions or None if not available
         :rtype: WeatherConditions | None
         """
+        self.logger.debug("Get conditions for zone: %s", zone)
         url = f"{BASE_URL}/{ZONES_PATH}/{FORECAST_PATH}/{zone}/{OBSERVATIONS_PATH}"
 
         try:
@@ -273,6 +280,7 @@ class NwsWeatherService:
         :return: A list of WeatherForecast objects or None if not available
         :rtype: list[WeatherForecast] | None
         """
+        self.logger.debug("Get forecasts for zone: %s", zone)
         url = f"{BASE_URL}/{ZONES_PATH}/{self.forecast_zone_type}/{zone}/{FORECAST_PATH}"
 
         try:
@@ -281,16 +289,21 @@ class NwsWeatherService:
 
             data = response.json()
             if 'properties' not in data:
+                self.logger.warning("Get forecasts missing 'properties'")
                 return None
             properties = data['properties']
             if 'periods' not in properties:
+                self.logger.warning("Get forecasts missing 'periods'")
                 return None
             periods = properties['periods']
             if periods is None or len(periods) <= 0:
+                self.logger.warning("Get forecasts periods is empty")
                 return None
             forecasts = []
             for current_period in periods:
                 if 'name' not in current_period or 'detailedForecast' not in current_period:
+                    self.logger.debug(
+                        "Get forecasts period is missing required fields")
                     continue
                 forecast = WeatherForecast(
                     current_period['name'], current_period['detailedForecast'])

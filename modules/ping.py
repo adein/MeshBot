@@ -19,16 +19,15 @@ class Ping(BotModule):
 
     def _handle_command(self, data: CommandData):
         if not self.is_enabled():
-            return
-        self.logger.info(
-            "EVENT TRIGGERED: received ping command with payload: %s", data)
-        if data.sender_id is None or (data.receiver_id is None and data.channel is None):
             self.logger.warning(
+                "Ping command triggered, but module is disabled.")
+            return
+        if data.sender_id is None or (data.receiver_id is None and data.channel is None):
+            self.logger.debug(
                 "Ping command is missing essential message data")
             return
+        self.logger.info("Handling ping command...")
         from_id = data.sender_id
-        to_id = data.receiver_id
-        channel_num = data.channel
         via_mqtt = data.via_mqtt
         snr = data.rx_snr
         hops_away = data.hops_away

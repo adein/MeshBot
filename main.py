@@ -29,11 +29,16 @@ def load_config():
 if __name__ == "__main__":
     # Load Config
     config = load_config()
+    # Extract Settings from the 'logging' section
+    log_cfg = config.get('logging', {})
+    file_level_str = log_cfg.get('file_level', 'DEBUG').upper()
+    log_filename = log_cfg.get('log_file', 'bot_activity.log')
+    # Configure Basic Logging (Startup Mode)
     logging.basicConfig(
-        level=getattr(logging, config['core'].get('log_level', 'INFO')),
+        level=getattr(logging, file_level_str, logging.DEBUG),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        filename='bot_activity.log',
-        filemode='w'
+        filename=log_filename,
+        filemode='a'
     )
     my_node_id: str = config['core'].get('my_node_id', 'ERROR')
 

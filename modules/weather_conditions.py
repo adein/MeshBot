@@ -26,15 +26,17 @@ class WeatherConditions(BotModule):
 
     def _handle_weather_request(self, data: CommandData):
         if not self.is_enabled():
-            return
-        self.logger.info(
-            "EVENT TRIGGERED: received weather conditions request event with data %s", data)
-        if data.sender_id is None or (data.receiver_id is None and data.channel is None):
             self.logger.warning(
+                "Weather command triggered, but module is disabled.")
+            return
+        if data.sender_id is None or (data.receiver_id is None and data.channel is None):
+            self.logger.debug(
                 "Weather command is missing essential message data")
             return
         # Geocode query into coordinates
         arguments = data.parameters
+        self.logger.info(
+            "Handling weather command with arguments: %s", arguments)
         if arguments is None or len(arguments) <= 0:
             self.mesh_service.send_reply("You must provide a location.", data)
             return

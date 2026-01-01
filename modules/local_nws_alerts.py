@@ -15,39 +15,46 @@ class NwsAlertChecker(BotModule):
         # Initialize the service once when the module loads
         self.api_service = NwsWeatherService()
         self.channel: int = self.config.get('channel', 0)
+        self.zone: str = self.config.get('zone', None)
+        if self.zone is None:
+            self.logger.error(
+                "NWS Alert Checker missing required zone configuration!")
 
     def execute(self):
-        zone: str = self.config.get('zone', None)
-        if zone is None:
-            self.logger.warning(
+        if not self.is_enabled():
+            self.logger.error(
+                "NWS Alert Checker triggered, but module is disabled. This shouldn't happen.")
+            return
+        if self.zone is None:
+            self.logger.error(
                 "NWS Alert Checker missing required zone configuration!")
             return
-        self.logger.info("Fetching weather alerts for zone %s...", zone)
-        data: list[WeatherAlert] | None = self.api_service.get_alerts(zone)
+        data: list[WeatherAlert] | None = self.api_service.get_alerts(
+            self.zone)
         if data is None or len(data) <= 0:
             # No alerts
             self.previous_alert_id = None
             return
-        self.logger.info("NWS Alerts: %s", data)
+        self.logger.debug("Fetched NWS Alerts: %s", data)
         now_utc = datetime.now(timezone.utc)
         reversed_alerts = data[::-1]
         for alert_to_process in reversed_alerts:
             if alert_to_process.alert_id is None:
                 # Skip alerts without an ID
-                self.logger.warning("Skipping alert due to missing ID!")
+                self.logger.debug("Skipping alert due to missing ID!")
                 continue
             elif now_utc > alert_to_process.expires:
                 # Skip expired alerts
-                self.logger.info("Skipping expired alert")
+                self.logger.debug("Skipping expired alert")
                 continue
             if alert_to_process.severity.lower() in ["minor", "unknown"]:
                 # Skip alerts not severe enough
-                self.logger.info("Skipping low or unknown severity alert")
+                self.logger.debug("Skipping low or unknown severity alert")
                 continue
             elif alert_to_process.alert_id == self.previous_alert_id:
                 # Same alert as before and not expired
                 # Return early
-                self.logger.info("Skipping same alert as previous check")
+                self.logger.debug("Skipping same alert as previous check")
                 return
             else:
                 # Process this alert
@@ -57,6 +64,7 @@ class NwsAlertChecker(BotModule):
         self.previous_alert_id = None
 
     def _process_alert(self, alert: WeatherAlert):
+        self.logger.info("Processing alert: %s", alert)
         self.previous_alert_id = alert.alert_id
         summary_string = "NWS Weather Alert (" + \
             alert.severity + "): " + alert.headline

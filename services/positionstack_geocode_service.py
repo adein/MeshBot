@@ -48,6 +48,7 @@ class PositionstackGeocodeService:
         :return: GpsLocation of the query, or None otherwise.
         :rtype: GpsLocation | None
         """
+        self.logger.debug("Getting coordinates for query: %s", query)
         url = f"{BASE_URL}"
         params = {
             API_KEY_PARAM: str(self.api_key),
@@ -56,7 +57,6 @@ class PositionstackGeocodeService:
         }
 
         try:
-            self.logger.info("Geo query with: %s", query)
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
             response_json = response.json()

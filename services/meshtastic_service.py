@@ -92,8 +92,6 @@ class MeshtasticService(BotService):
         self.reconnect_max_delay: int = self.config.get(
             'reconnect_max_delay', 300)
         self.dedup_window: float = float(self.config.get('dedup_window', 5.0))
-        self.logger.info("Node IP: %s", self.node_ip)
-        self.logger.info("Node Port: %s", self.node_port)
         # Subscribe to meshtastic library events
         pub.subscribe(self._on_connected, "meshtastic.connection.established")
         pub.subscribe(self._on_disconnected, "meshtastic.connection.lost")
@@ -160,7 +158,7 @@ class MeshtasticService(BotService):
         """
         Initializes the library and registers callbacks.
         """
-        self.logger.info("Initializing hardware interface...")
+        self.logger.debug("Initializing hardware connection...")
         # TODO: Support auto choosing serial/tcp interface via config.yaml
         # self.interface = meshtastic.serial_interface.SerialInterface()
         self.interface = meshtastic.tcp_interface.TCPInterface(
@@ -170,7 +168,7 @@ class MeshtasticService(BotService):
         """
         Checks 'isConnected' periodically.
         """
-        self.logger.info("Monitoring connection status...")
+        self.logger.debug("Monitoring connection status...")
         while self.running:
             if not self.interface.isConnected.is_set():
                 raise ConnectionError("Hardware reported disconnect")
@@ -188,8 +186,8 @@ class MeshtasticService(BotService):
         :param to_channel_number: The destination channel number (if sending to a channel)
         :type to_channel_number: int | None
         """
-        self.logger.info("Send text message: %s to channel: %d, node: %s",
-                         text, to_channel_number, to_node_id)
+        self.logger.debug("Send text message: %s to channel: %d, node: %s",
+                          text, to_channel_number, to_node_id)
         if text is None or (to_node_id is None and to_channel_number is None):
             return None
         text_to_send = text[:200]
@@ -212,8 +210,8 @@ class MeshtasticService(BotService):
         :param to_channel_number: The destination channel number (if sending to a channel)
         :type to_channel_number: int | None
         """
-        self.logger.info("Send text alert: %s to channel: %d, node: %s",
-                         text, to_channel_number, to_node_id)
+        self.logger.debug("Send text alert: %s to channel: %d, node: %s",
+                          text, to_channel_number, to_node_id)
         if text is None or (to_node_id is None and to_channel_number is None):
             return None
         text_to_send = text[:200]
@@ -235,45 +233,24 @@ class MeshtasticService(BotService):
         :rtype: bool
         """
         if command_data.sender_id is not None and command_data.receiver_id == self.my_node_id:
+            self.logger.debug("Send reply: %s, to node: %s",
+                              reply, command_data.sender_id)
             self.send_text(reply, to_node_id=command_data.sender_id)
             return True
         elif command_data.channel is not None and command_data.receiver_id == "^all":
+            self.logger.debug("Send reply: %s, to channel: %d",
+                              reply, command_data.channel)
             self.send_text(reply, to_channel_number=command_data.channel)
             return True
         else:
             self.logger.warning(
-                "Unable to handle about command! Make sure your node ID is set correctly in config.")
+                "Unable to send reply! Make sure your node ID is set correctly in config.")
         return False
-
-    def _is_duplicate(self, msg_hash: str) -> bool:
-        """
-        Checks if the message hash exists and is recent.
-        Also cleans up old cache entries to prevent memory leaks.
-        """
-        now = time.time()
-        with self.dedup_lock:
-            # Check if exists and is fresh
-            if msg_hash in self.seen_messages:
-                last_seen = self.seen_messages[msg_hash]
-                if now - last_seen < self.dedup_window:
-                    return True
-            # Not a duplicate. Add to cache.
-            self.seen_messages[msg_hash] = now
-            # Cleanup (only runs occasionally to save CPU)
-            if len(self.seen_messages) > 100:
-                self._prune_cache(now)
-            return False
-
-    def _prune_cache(self, now):
-        """Remove entries older than the window. MUST be called from within a lock."""
-        to_remove = [k for k, v in self.seen_messages.items()
-                     if now - v > self.dedup_window]
-        for k in to_remove:
-            del self.seen_messages[k]
 
     def _on_receive_text_to_send(self, data: TextToSend):
         # Called when a text message to send has been received internally from the event bus
-        self.logger.info("Received a text message to send with data: %s", data)
+        self.logger.debug(
+            "Received a text message to send with data: %s", data)
         if not self.connected:
             self.logger.warning("Disconnected! Unable to send text message")
             return
@@ -287,14 +264,45 @@ class MeshtasticService(BotService):
             elif to_channel_number is not None:
                 self.send_alert(text, to_channel_number=to_channel_number)
             else:
-                self.logger.warning("Unable to send message - missing data!")
+                self.logger.warning(
+                    "Unable to send message - missing destination data!")
         else:
             if to_node_id is not None:
                 self.send_text(text, to_node_id=to_node_id)
             elif to_channel_number is not None:
                 self.send_text(text, to_channel_number=to_channel_number)
             else:
-                self.logger.warning("Unable to send message - missing data!")
+                self.logger.warning(
+                    "Unable to send message - missing destination data!")
+
+    def _is_duplicate(self, msg_hash: str) -> bool:
+        """
+        Checks if the message hash exists and is recent.
+        Also cleans up old cache entries to prevent memory leaks.
+        """
+        now = time.time()
+        with self.dedup_lock:
+            # Check if exists and is fresh
+            if msg_hash in self.seen_messages:
+                last_seen = self.seen_messages[msg_hash]
+                if now - last_seen < self.dedup_window:
+                    self.logger.debug(
+                        "Message is a duplicate (seen %.2f s ago)", now - last_seen)
+                    return True
+            # Not a duplicate. Add to cache.
+            self.seen_messages[msg_hash] = now
+            # Cleanup (only runs occasionally to save CPU)
+            if len(self.seen_messages) > 100:
+                self._prune_cache(now)
+            return False
+
+    def _prune_cache(self, now):
+        """Remove entries older than the window. MUST be called from within a lock."""
+        self.logger.debug("Pruning deduplication cache...")
+        to_remove = [k for k, v in self.seen_messages.items()
+                     if now - v > self.dedup_window]
+        for k in to_remove:
+            del self.seen_messages[k]
 
     def _on_connected(self, interface, topic=pub.AUTO_TOPIC):
         # Called when we (re)connect to the radio
@@ -310,12 +318,12 @@ class MeshtasticService(BotService):
 
     def _on_receive_node_update(self, node, interface):
         # Called when a node update arrives
-        self.logger.info("Received node update: %s ", node)
+        self.logger.debug("Received node update: %s ", node)
         node_id: str | None = None
         if 'user' in node and 'id' in node['user']:
             node_id = node['user']['id']
         if node_id is None or node_id == '':
-            self.logger.warning("Node ID is missing in node packet!")
+            self.logger.debug("Node ID is missing in node packet!")
             return
         current_info: NodeInfo | None = self.db.get_node(node_id)
         if current_info is None:
@@ -358,9 +366,9 @@ class MeshtasticService(BotService):
 
     def _on_receive_position_packet(self, packet, interface):
         # Called when a position packet arrives
-        self.logger.info("Received position packet: %s", packet)
+        self.logger.debug("Received position packet: %s", packet)
         if "fromId" not in packet or "decoded" not in packet or "position" not in packet["decoded"]:
-            self.logger.warning(
+            self.logger.debug(
                 "Unable to parse position packet: missing decoded or position fields")
             return
         node_id = None
@@ -372,7 +380,7 @@ class MeshtasticService(BotService):
         via_mqtt = None
         node_id = packet["fromId"]
         if node_id is None or node_id == '':
-            self.logger.warning("Node ID is missing in position packet!")
+            self.logger.debug("Node ID is missing in position packet!")
             return
         if "transportMechanism" in packet:
             via_mqtt = packet['transportMechanism'] == "TRANSPORT_MQTT"
@@ -409,9 +417,9 @@ class MeshtasticService(BotService):
 
     def _on_receive_user_packet(self, packet, interface):
         # Called when a user packet arrives
-        self.logger.info("Received user packet: %s", packet)
+        self.logger.debug("Received user packet: %s", packet)
         if "decoded" not in packet or "user" not in packet["decoded"] or "id" not in packet["decoded"]["user"]:
-            self.logger.warning(
+            self.logger.debug(
                 "Unable to parse user packet: missing decoded or user fields")
             return
         node_id = None
@@ -426,7 +434,7 @@ class MeshtasticService(BotService):
         user = packet["decoded"]["user"]
         node_id = user["id"]
         if node_id is None or node_id == '':
-            self.logger.warning("Node ID is missing in user packet!")
+            self.logger.debug("Node ID is missing in user packet!")
             return
         via_mqtt = True
         if "transportMechanism" in packet:
@@ -475,14 +483,14 @@ class MeshtasticService(BotService):
 
     def _on_receive_text_packet(self, packet, interface):
         # Called when a text packet arrives
-        self.logger.info("Received text packet: %s", packet)
+        self.logger.debug("Received text packet: %s", packet)
         payload = packet.get('decoded', {})
         text = payload.get('text', '')
         sender_id = packet.get('fromId', '')
         receiver_id = packet.get('toId', '')
         try:
             if not text:
-                self.logger.warning(
+                self.logger.debug(
                     "Unable to parse text packet: missing decoded or text fields")
                 return
             # Create a unique fingerprint for this message
@@ -491,12 +499,12 @@ class MeshtasticService(BotService):
             msg_hash = hashlib.md5(unique_str.encode('utf-8')).hexdigest()
             # Check for Duplicate
             if self._is_duplicate(msg_hash):
-                self.logger.info(
+                self.logger.debug(
                     "♻️ Ignored duplicate message from %s", sender_id)
                 return
             # Message is not a duplicate
         except Exception as e:
-            self.logger.error("Error parsing packet: %s", e, exc_info=True)
+            self.logger.debug("Error parsing packet: %s", e, exc_info=True)
 
         channel_log_value = packet.get('channel', None)
         if channel_log_value is None:
@@ -571,7 +579,6 @@ class MeshtasticService(BotService):
             via_mqtt,
             receiver_id != '^all'
         )
-        self.event_bus.publish(TEXT_MESSAGE_TOPIC, text_packet)
         if node_id is not None and node_id != '':
             current_info = self.db.get_node(node_id)
             if current_info is None:
@@ -589,3 +596,4 @@ class MeshtasticService(BotService):
                 if current_info.last_heard is None or (rx_time > current_info.last_heard):
                     current_info.last_heard = rx_time
             self.db.update_node(current_info)
+        self.event_bus.publish(TEXT_MESSAGE_TOPIC, text_packet)

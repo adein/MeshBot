@@ -41,13 +41,15 @@ class Help(BotModule):
 
     def _handle_command(self, data: CommandData):
         if not self.is_enabled():
+            self.logger.warning(
+                "Help command triggered, but module is disabled.")
             return
-        self.logger.info(
-            "EVENT TRIGGERED: received help command with payload: %s", data)
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.info("Help command is missing essential message data")
+            self.logger.debug(
+                "Help command is missing essential message data")
             return
 
+        self.logger.info("Handling help command...")
         arguments = data.parameters
         if arguments is None or len(arguments) <= 0:
             self.mesh_service.send_reply(self.all_help, data)

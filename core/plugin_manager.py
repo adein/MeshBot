@@ -29,7 +29,7 @@ class PluginManager:
         """
         Scans the modules directory and loads valid BotModule classes.
         """
-        self.logger.info("Scanning for modules in %s...", self.modules_dir)
+        self.logger.debug("Scanning for modules in %s...", self.modules_dir)
         if not os.path.exists(self.modules_dir):
             self.logger.error("Directory %s not found.", self.modules_dir)
             return
@@ -40,7 +40,7 @@ class PluginManager:
     def _load_single_file(self, filename: str):
         module_name = filename[:-3]
         file_path = os.path.join(self.modules_dir, filename)
-
+        self.logger.debug("Loading module file: %s", file_path)
         try:
             # Dynamic import magic
             spec = importlib.util.spec_from_file_location(

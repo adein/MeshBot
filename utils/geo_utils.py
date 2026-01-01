@@ -21,11 +21,9 @@ def get_city_state_online(lat: float, lon: float) -> str:
     :return: The city and state as a string, or 'Unknown' on failure.
     :rtype: str
     """
+    logger.debug("Reverse geocoding %s, %s...", lat, lon)
     if not lat or not lon:
         return "Unknown"
-
-    logger.info("Reverse geocoding %s, %s...", lat, lon)
-
     try:
         location = geolocator.reverse(
             f"{lat}, {lon}", language='en', exactly_one=True)
@@ -37,10 +35,13 @@ def get_city_state_online(lat: float, lon: float) -> str:
             if state:
                 return f"{city}, {state}"
             return city
+        else:
+            logger.debug(
+                "No results from online geocoding for %s, %s", lat, lon)
 
     except Exception as e:
-        logger.warning("Geocoding failed for %s, %s: %s",
-                       lat, lon, e, exc_info=True)
+        logger.error("Geocoding failed for %s, %s: %s",
+                     lat, lon, e, exc_info=True)
 
     return "Unknown"
 
@@ -56,11 +57,9 @@ def get_city_state_offline(lat: float, lon: float) -> str:
     :return: The city and state as a string, or 'Unknown' on failure.
     :rtype: str
     """
+    logger.debug("Reverse geocoding %s, %s...", lat, lon)
     if not lat or not lon:
         return "Unknown"
-
-    logger.info("Reverse geocoding %s, %s...", lat, lon)
-
     try:
         coordinates = (lat, lon)
         results = rg.search([coordinates], mode=1, verbose=False)
@@ -73,11 +72,11 @@ def get_city_state_offline(lat: float, lon: float) -> str:
                 return f"{city}, {state}"
             return city
         else:
-            logger.info(
+            logger.debug(
                 "No results from offline geocoding for %s, %s", lat, lon)
 
     except Exception as e:
-        logger.warning("Geocoding failed for %s, %s: %s",
-                       lat, lon, e, exc_info=True)
+        logger.error("Geocoding failed for %s, %s: %s",
+                     lat, lon, e, exc_info=True)
 
     return "Unknown"

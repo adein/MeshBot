@@ -86,15 +86,44 @@ class BotDashboard(App):
 
     def on_mount(self):
         """Called when the app starts. Setup logging hook."""
-        # Add our custom handler to the root logger
-        handler = TextualLogHandler(self.system_log)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
-        handler.setFormatter(formatter)
+        # Assumes self.plugin_mgr.config has the root/full config dict
+        config = self.plugin_mgr.config
+        log_cfg = config.get('logging', {})
+        file_lvl_str = log_cfg.get('file_level', 'DEBUG').upper()
+        ui_lvl_str = log_cfg.get('ui_level', 'INFO').upper()
+        log_filename = log_cfg.get('log_file', 'bot_activity.log')
+        # Map strings to constants
+        file_level = getattr(logging, file_lvl_str, logging.DEBUG)
+        ui_level = getattr(logging, ui_lvl_str, logging.INFO)
+        # Setup Root Logger
         root_logger = logging.getLogger()
-        root_logger.addHandler(handler)
+        # The Root logger must be the LOWEST common denominator.
+        root_logger.setLevel(min(file_level, ui_level))
+        root_logger.handlers.clear()
+        # Setup File Handler
+        try:
+            file_handler = logging.FileHandler(log_filename, mode='a')
+            file_handler.setLevel(file_level)
+            file_fmt = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(file_fmt)
+            root_logger.addHandler(file_handler)
+        except Exception as e:
+            self.console_output.write(f"[red]Failed to setup log file: {e}[/]")
+        # Setup UI Handler
+        ui_handler = TextualLogHandler(self.system_log)
+        ui_handler.setLevel(ui_level)
+        ui_fmt = logging.Formatter('%(asctime)s - %(message)s')
+        ui_handler.setFormatter(ui_fmt)
+        root_logger.addHandler(ui_handler)
+        # Silence Noise
+        logging.getLogger("asyncio").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        # Announce Ready
+        self.console_output.write(
+            f"[bold yellow]Logging Initialized (File: {file_lvl_str}, UI: {ui_lvl_str}).[/]")
         self.console_output.write(
             "[bold green]Welcome to the MeshBot admin console. Type help or ? to list commands.[/]")
-        self.console_output.write("[bold yellow]Admin Console Ready.[/]")
         self.query_one("#command_input").focus()
 
     @on(Input.Submitted, "#command_input")

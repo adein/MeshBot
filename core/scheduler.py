@@ -26,11 +26,11 @@ class BotScheduler:
         self.running_event.set()
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
-        self.logger.info("Scheduler thread started.")
+        self.logger.debug("Scheduler thread started.")
 
     def stop(self):
         """Signals the background thread to stop."""
-        self.logger.info("Stopping scheduler...")
+        self.logger.debug("Stopping scheduler...")
         self.running_event.clear()
         if self.thread:
             self.thread.join(timeout=2)
@@ -47,7 +47,7 @@ class BotScheduler:
 
                 if interval <= 0:
                     self.logger.info(
-                        "Not scheduling module '%s' (Event Driven)", name)
+                        "Not scheduling module '%s' (Command/Event Driven)", name)
                     continue
                 # Schedule the safe execution wrapper
                 schedule.every(interval).seconds.do(self._safe_execute, module)
