@@ -22,25 +22,29 @@ class NodeSearch(BotModule):
 
     def handle_search_request(self, data: CommandData):
         if not self.is_enabled():
+            self.logger.warning(
+                "NodeSearch command triggered, but module is disabled.")
             return
         if not self.db:
+            self.logger.error(
+                "NodeSearch command could not access the database!")
             return
-        self.logger.info(
-            "EVENT TRIGGERED: received node search request event with data %s", data)
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.warning(
+            self.logger.debug(
                 "NodeSearch command is missing essential message data")
             return
 
         arguments = data.parameters
         if arguments is None or len(arguments) <= 0:
-            self._send_message("You must provide a search query.", data)
+            self.mesh_service.send_reply(
+                "You must provide a search query.", data)
             return
         query = ' '.join(arguments)
+        self.logger.info("Handling nodesearch command with query: %s", query)
         results = self.db.search_nodes(query)
 
         if not results:
-            self._send_message("No matching nodes found.", data)
+            self.mesh_service.send_reply("No matching nodes found.", data)
         else:
             # SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
             results_list = []

@@ -19,24 +19,22 @@ class StatsReporter(BotModule):
 
     def handle_stats_request(self, data: CommandData):
         if not self.is_enabled():
+            self.logger.warning(
+                "Stats command triggered, but module is disabled.")
             return
         if not self.db:
+            self.logger.error(
+                "Stats command could not access the database!")
             return
-        self.logger.info(
-            "EVENT TRIGGERED: received stats request event with data %s", data)
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.warning(
+            self.logger.debug(
                 "Stats command is missing essential message data")
             return
 
-        from_id = data.sender_id
-        to_id = data.receiver_id
-        channel_num = data.channel
         args = data.parameters
         mode = args[0] if args else "commands"
-
         output = []
-
+        self.logger.info("Handling stats command with mode: %s", mode)
         if mode == "commands":
             rows = self.db.get_top_commands()
             output.append("📊 Top Commands:")

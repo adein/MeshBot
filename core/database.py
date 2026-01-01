@@ -61,7 +61,7 @@ class Database:
         except Exception as e:
             self.logger.error("Failed to configure DB: %s", e, exc_info=True)
         self._create_tables()
-        self.logger.info("Database connected.")
+        self.logger.debug("Database opened.")
 
     def disconnect(self):
         """
@@ -70,9 +70,10 @@ class Database:
         if self.conn:
             with self.db_lock:
                 self.conn.close()
-            self.logger.info("Database closed.")
+        self.logger.debug("Database closed.")
 
     def _create_tables(self):
+        self.logger.debug("Creating initial database tables...")
         with self.db_lock:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -112,6 +113,8 @@ class Database:
         :param user_id: The (node) ID of the user who issued the command.
         :type user_id: str
         """
+        self.logger.debug(
+            "Logging command usage: %s by user %s", command_name, user_id)
         try:
             with self.db_lock:
                 with self.conn:
@@ -131,6 +134,8 @@ class Database:
         :param channel_number: The channel number where the message was sent.
         :type channel_number: int
         """
+        self.logger.debug(
+            "Logging message from user %s on channel %d", user_id, channel_number)
         try:
             with self.db_lock:
                 with self.conn:
@@ -148,6 +153,8 @@ class Database:
         :param node_info: The node details to store.
         :type node_info: NodeInfo
         """
+        self.logger.info("Updating information for node: %s",
+                         node_info.node_id)
         try:
             # Convert Dataclass to Dictionary
             # This ensures we have all keys: node_id, long_name, etc.
@@ -184,6 +191,7 @@ class Database:
         :return: The NodeInfo if found, else None.
         :rtype: NodeInfo | None
         """
+        self.logger.debug("Getting information for node %s", node_id)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -209,6 +217,7 @@ class Database:
         :return: List of rows containing (command, count).
         :rtype: list[Row]
         """
+        self.logger.debug("Retrieving top %d commands", limit)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -233,6 +242,7 @@ class Database:
         :return: List of rows containing (node_id, channel, count).
         :rtype: list[Row]
         """
+        self.logger.debug("Retrieving top %d talkers", limit)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -256,6 +266,7 @@ class Database:
         :return: List of rows containing (channel, count).
         :rtype: list[Row]
         """
+        self.logger.debug("Retrieving channel usage")
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -282,6 +293,7 @@ class Database:
         :return: List of rows containing node information.
         :rtype: list[Row]
         """
+        self.logger.debug("Searching nodes with query: %s", query_text)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -299,7 +311,7 @@ class Database:
             ''', (wildcard_query, wildcard_query, wildcard_query, wildcard_query, limit,))
             return cursor.fetchall()
         except Exception as e:
-            self.logger.error("Search failed: %s", e, exc_info=True)
+            self.logger.error("Node search failed: %s", e, exc_info=True)
             return []
         finally:
             temp_conn.close()

@@ -27,11 +27,14 @@ class About(BotModule):
 
     def _handle_command(self, data: CommandData):
         if not self.is_enabled():
+            self.logger.warning(
+                "About command triggered, but module is disabled.")
             return
         if data.sender_id is None or (data.receiver_id is None and data.channel is None):
-            self.logger.warning(
+            self.logger.debug(
                 "About command is missing essential message data")
             return
+        self.logger.info("Handling about command...")
         message_to_send = ABOUT
         contact_message = None
         if self.contact_node_id != NOT_PROVIDED:

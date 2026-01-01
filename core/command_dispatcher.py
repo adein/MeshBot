@@ -54,7 +54,7 @@ class CommandDispatcher:
         """
         if not os.path.exists(self.commands_dir):
             os.makedirs(self.commands_dir)
-        self.logger.info("Loading commands from %s... ", self.commands_dir)
+        self.logger.debug("Loading commands from %s... ", self.commands_dir)
         for filename in os.listdir(self.commands_dir):
             if filename.endswith(".py") and not filename.startswith("__"):
                 self._load_file(filename)
@@ -94,7 +94,7 @@ class CommandDispatcher:
         Start the command dispatcher by subscribing to the event bus.
         """
         self.event_bus.subscribe(TEXT_MESSAGE_TOPIC, self.handle_message)
-        self.logger.info("Command Dispatcher started.")
+        self.logger.debug("Command Dispatcher started.")
 
     def handle_message(self, packet: TextPacket):
         """
@@ -110,13 +110,12 @@ class CommandDispatcher:
         trigger_word = parts[0][1:]
         command = self.registry.get(trigger_word)
         if command:
-            self.logger.info("Command recognized: !%s", trigger_word)
+            self.logger.debug("Command recognized: !%s", trigger_word)
             sender_id = packet.sender_id
             db = self.services.get('db')
             if db:
                 db.log_command(trigger_word, sender_id)
             args_list = parts[1:] if len(parts) > 1 else None
-
             receiver_id = packet.receiver_id
             parameters = args_list
             raw_message = text
@@ -140,4 +139,4 @@ class CommandDispatcher:
             )
             self.event_bus.publish(command.event_topic, data)
         else:
-            self.logger.info("Unknown command: !%s", trigger_word)
+            self.logger.debug("Unknown command: !%s", trigger_word)
