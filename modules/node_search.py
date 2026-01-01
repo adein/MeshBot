@@ -46,68 +46,58 @@ class NodeSearch(BotModule):
         if not results:
             self.mesh_service.send_reply("No matching nodes found.", data)
         else:
-            # SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
             results_list = []
             for row in results:
                 # Handle potential None values safely
-                node_id = str(row[0] or "???")
-                long_name = str(row[1] or "Unknown")
-                short_name = str(row[2] or "Unknown")
-                hw_model = str(row[3] or "Unknown")
-                role = str(row[4] or "Unknown")
+                node_id = str(row[0]) if row[0] is not None else None
+                long_name = str(row[1]) if row[1] is not None else None
+                short_name = str(row[2]) if row[2] is not None else None
+                hw_model = str(row[3]) if row[3] is not None else None
+                role = str(row[4]) if row[4] is not None else None
                 lat = row[5]
                 lon = row[6]
-                altitude = str(row[7]) if row[7] is not None else "N/A"
+                altitude = str(row[7]) if row[7] is not None else None
                 raw_last_seen = row[12]
-                raw_unmessagable = row[13]
 
                 if lat and lon:
                     location_str = get_city_state_offline(lat, lon)
                 else:
-                    location_str = "N/A"
+                    location_str = None
                 if raw_last_seen:
                     dt = datetime.fromtimestamp(float(raw_last_seen))
                     last_seen_str = dt.strftime("%m-%d-%y %H:%M")
                 else:
-                    last_seen_str = "N/A"
-                if raw_unmessagable == 1:
-                    unmessagable = "Yes"
-                else:
-                    unmessagable = "No"
+                    last_seen_str = None
 
                 name_to_show = long_name if long_name else short_name
                 current_string = ""
                 separater = ""
                 if node_id:
-                    current_string = f"ID: {node_id}"
+                    current_string = f"🆔: {node_id}"
                     separater = ", "
                 if name_to_show:
                     current_string = current_string + \
-                        separater + f"Name: {name_to_show}"
+                        separater + f"✏️: {name_to_show}"
                     separater = ", "
                 if hw_model:
                     current_string = current_string + \
-                        separater + f"HW: {hw_model}"
+                        separater + f"📟: {hw_model}"
                     separater = ", "
                 if role:
                     current_string = current_string + \
-                        separater + f"Role: {role}"
+                        separater + f"️⚙️: {role}"
                     separater = ", "
                 if location_str:
                     current_string = current_string + \
-                        separater + f"Loc: {location_str}"
+                        separater + f"📍: {location_str}"
                     separater = ", "
                 if altitude:
                     current_string = current_string + \
-                        separater + f"Alt: {altitude}"
-                    separater = ", "
-                if unmessagable:
-                    current_string = current_string + \
-                        separater + f"Infra: {unmessagable}"
+                        separater + f"⛰️: {altitude}"
                     separater = ", "
                 if last_seen_str:
                     current_string = current_string + \
-                        separater + f"Seen: {last_seen_str}"
+                        separater + f"🕘: {last_seen_str}"
                 results_list.append(current_string)
-            results_string = "\n".join(results_list)[:200]
+            results_string = "\n".join(results_list)
             self.mesh_service.send_reply(results_string, data)

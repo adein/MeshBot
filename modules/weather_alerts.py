@@ -90,7 +90,8 @@ class WeatherAlerts(BotModule):
             expires_utc = alert.expires
             expires_local = expires_utc.astimezone(self.local_tz)
             expires_string = expires_local.strftime("%m/%d/%Y %I:%M %p")
-            alert_prefix = "NWS Alert (" + alert.severity + "): "
+            alert_emoji = self._get_severity_emoji(alert.severity)
+            alert_prefix = "NWS Alert " + alert_emoji + ": "
             if len(alert_prefix) + len(alert.description) <= 200:
                 alert_summary = alert_prefix + alert.description
             elif len(alert_prefix) + len(alert.headline) + 11 + len(expires_string) <= 200:
@@ -119,3 +120,16 @@ class WeatherAlerts(BotModule):
         expires_local = expires_utc.astimezone(self.local_tz)
         expires_string = expires_local.strftime("%m/%d/%Y %I:%M %p")
         return alert.headline + ". Expires: " + expires_string
+
+    def _get_severity_emoji(self, severity: str) -> str:
+        severity_lower = severity.lower()
+        if severity_lower == "extreme" or severity_lower == "urgent":
+            return "🚨"
+        elif severity_lower == "severe" or severity_lower == "high" or severity_lower == "major":
+            return "️❗️"
+        elif severity_lower == "moderate":
+            return "⚠️"
+        elif severity_lower == "minor":
+            return "ℹ️"
+        else:
+            return f"({severity})"

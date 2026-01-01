@@ -2,7 +2,7 @@ from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
 
 
-ABOUT = "MeshBot by Adein"
+ABOUT = "MeshBot 🤖 by Adein"
 NOT_PROVIDED = "NOT_PROVIDED"
 
 
@@ -38,13 +38,13 @@ class About(BotModule):
         message_to_send = ABOUT
         contact_message = None
         if self.contact_node_id != NOT_PROVIDED:
-            contact_message = f"For any issues, requests, etc - Contact me at {self.contact_node_id}"
+            contact_message = f"For any issues, requests, etc - 📟 Message me at {self.contact_node_id}"
         if self.contact_email != NOT_PROVIDED:
             if contact_message is None:
-                contact_message = f"For any issues, requests, etc - Email me at {self.contact_email}"
+                contact_message = f"For any issues, requests, etc - 📧 Email me at {self.contact_email}"
             else:
                 contact_message = contact_message + \
-                    f" or by email at {self.contact_email}"
+                    f" or by 📧 email at {self.contact_email}"
         if contact_message is not None:
             message_to_send = message_to_send + "\n" + contact_message
         self.mesh_service.send_reply(message_to_send, data)

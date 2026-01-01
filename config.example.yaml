@@ -35,6 +35,14 @@ modules:
   stats_reporter:
     enabled: true
     interval_seconds: 0
+    channel_0_name: "LongFast"
+    channel_1_name: "YourChannel1"
+    channel_2_name: "YourChannel2"
+    channel_3_name: "YourChannel3"
+    channel_4_name: "YourChannel4"
+    channel_5_name: "YourChannel5"
+    channel_6_name: "YourChannel6"
+    channel_7_name: "YourChannel7"
   weather_alerts:
     enabled: true
     interval_seconds: 0
