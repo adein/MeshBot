@@ -25,6 +25,19 @@ class StatsReporter(BotModule):
         # Triggered, so this is empty
         pass
 
+    def _get_channel_name(self, channel_id: int) -> str:
+        channel_names = {
+            0: self.channel_0_name,
+            1: self.channel_1_name,
+            2: self.channel_2_name,
+            3: self.channel_3_name,
+            4: self.channel_4_name,
+            5: self.channel_5_name,
+            6: self.channel_6_name,
+            7: self.channel_7_name,
+        }
+        return channel_names.get(channel_id, str(channel_id))
+
     def handle_stats_request(self, data: CommandData):
         if not self.is_enabled():
             self.logger.warning(
@@ -57,32 +70,19 @@ class StatsReporter(BotModule):
                 user_info = self.db.get_node(user)
                 if user_info is not None and user_info.long_name:
                     user_display = user_info.long_name
-                chan_str = f"Ch {channel}"
+                channel_name = self._get_channel_name(channel)
+                if channel_name is None:
+                    channel_name = f"{channel}"
                 if channel == -1:
-                    chan_str = "DM  "
-                output.append(f"{chan_str} | {count} | {user_display}")
+                    channel_name = "DM w/ Bot"
+                output.append(f"{channel_name} | {count} | {user_display}")
 
         elif mode == "channels":
             rows = self.db.get_channel_usage()
             output.append("📻 Channel Usage:")
             for channel, count in rows:
-                if channel == 0:
-                    channel_name = self.channel_0_name
-                elif channel == 1:
-                    channel_name = self.channel_1_name
-                elif channel == 2:
-                    channel_name = self.channel_2_name
-                elif channel == 3:
-                    channel_name = self.channel_3_name
-                elif channel == 4:
-                    channel_name = self.channel_4_name
-                elif channel == 5:
-                    channel_name = self.channel_5_name
-                elif channel == 6:
-                    channel_name = self.channel_6_name
-                elif channel == 7:
-                    channel_name = self.channel_7_name
-                else:
+                channel_name = self._get_channel_name(channel)
+                if channel_name is None:
                     channel_name = f"{channel}"
                 output.append(f"{channel_name}: {count} msgs")
 
