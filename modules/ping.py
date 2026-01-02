@@ -7,8 +7,8 @@ class Ping(BotModule):
     Module to respond to 'ping' commands with 'pong' messages.
     """
 
-    def __init__(self, name: str, config, global_services: dict, my_node: str):
-        super().__init__(name, config, global_services, my_node)
+    def __init__(self, name: str, config, root_config, global_services: dict, my_node: str):
+        super().__init__(name, config, root_config, global_services, my_node)
         # Listen for the command event
         if self.event_bus:
             self.event_bus.subscribe("bot.command.ping", self._handle_command)

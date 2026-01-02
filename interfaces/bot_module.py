@@ -11,9 +11,10 @@ class BotModule(ABC):
     Abstract base class for bot modules.
     """
 
-    def __init__(self, name: str, config, global_services: dict, my_node: str):
+    def __init__(self, name: str, config, root_config, global_services: dict, my_node: str):
         self.name: str = name
         self.config = config
+        self.root_config = root_config
         self.services: dict = global_services
         self.my_node_id: str = my_node
         self.db: Database = self.services.get('db')

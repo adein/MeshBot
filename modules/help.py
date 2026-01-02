@@ -28,8 +28,8 @@ class Help(BotModule):
     Module to respond to 'help' commands with usage information.
     """
 
-    def __init__(self, name: str, config, global_services: dict, my_node: str):
-        super().__init__(name, config, global_services, my_node)
+    def __init__(self, name: str, config, root_config, global_services: dict, my_node: str):
+        super().__init__(name, config, root_config, global_services, my_node)
         self.all_help: str = GENERAL_HELP + "\n" + WEATHER_HELP
         # Subscribe to the command event
         if self.event_bus:
