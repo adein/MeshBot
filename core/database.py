@@ -362,3 +362,45 @@ class Database:
             return []
         finally:
             temp_conn.close()
+
+    def get_nodes_near(self, lat: float, lon: float, radius_miles: int = 20) -> list[sqlite3.Row]:
+        """
+        Searches for nodes within roughly `radius_miles` of a point.
+
+        :param lat: The latitude of the center point.
+        :type lat: float
+        :param lon: The longitude of the center point.
+        :type lon: float
+        :param radius_miles: The radius in miles to search within.
+        :type radius_miles: int
+        :return: List of rows containing node information within the radius.
+        :rtype: list[Row]
+        """
+        # Calculate Bounding Box (approximation for speed and simplicity)
+        # 1 degree lat ~= 69 miles
+        # 1 degree lon ~= 69 miles * cos(lat)
+        lat_change = radius_miles / 69.0
+        lon_change = radius_miles / 50.0  # Estimate for US latitudes
+        min_lat = lat - lat_change
+        max_lat = lat + lat_change
+        min_lon = lon - lon_change
+        max_lon = lon + lon_change
+        self.logger.debug(
+            "Searching nodes near lat: %f, lon: %f, radius: %d miles", lat, lon, radius_miles)
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
+        try:
+            temp_conn.row_factory = sqlite3.Row
+            cursor = temp_conn.cursor()
+            cursor.execute('''
+                SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                FROM nodes
+                WHERE latitude BETWEEN ? AND ?
+                    AND longitude BETWEEN ? AND ?
+            ''', (min_lat, max_lat, min_lon, max_lon))
+            rows = cursor.fetchall()
+            return rows
+        except Exception as e:
+            self.logger.error("Geo-search failed: %s", e, exc_info=True)
+            return []
+        finally:
+            temp_conn.close()
