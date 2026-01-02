@@ -11,7 +11,7 @@ from core.event_bus import EventBus
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
 from ui.log_handler import TextualLogHandler
-from utils.geo_utils import get_city_state_offline
+from utils.geo_utils import get_city_state_offline, get_lat_lon_from_string, calculate_distance
 
 
 class BotDashboard(App):
@@ -194,83 +194,7 @@ class BotDashboard(App):
                 "  [cyan]toggle <module_name>[/]: Enable/Disable a module.")
 
         elif base == "node_search":
-            if not args:
-                self.console_output.write(
-                    "[red]Usage: node_search <name or id>[/]")
-                return
-
-            # Access the DB Service via the Plugin Manager's registry
-            db = self.plugin_mgr.services.get('db')
-            if not db:
-                self.console_output.write(
-                    "[bold red]Error: Database Service not loaded.[/]")
-                return
-
-            clean_args = ' '.join(args)
-            self.console_output.write(
-                f"Searching for: [bold cyan]'{clean_args}'[/]...")
-            results = db.search_nodes(clean_args, limit=20)
-
-            if not results:
-                self.console_output.write(
-                    "[yellow]No matching nodes found.[/]")
-            else:
-                # Create a pretty table
-                table = Table(title=f"Search Results ({len(results)})")
-                table.add_column("Node ID", style="cyan")
-                table.add_column("Long Name", style="green")
-                table.add_column("Short", style="magenta")
-                table.add_column("Hardware", style="white")
-                table.add_column("Role", style="blue")
-                table.add_column("Location", style="red")
-                table.add_column("Altitude", style="pink1")
-                table.add_column("SNR", style="yellow")
-                table.add_column("MQTT", style="purple")
-                table.add_column("Channel", style="sky_blue2")
-                table.add_column("Hops", style="orange1")
-                table.add_column("Unmessagable", style="violet")
-                table.add_column("Time", style="grey53")
-
-                for row in results:
-                    # Handle potential None values safely
-                    node_id = str(row[0] or "???")
-                    long_name = str(row[1] or "Unknown")
-                    short_name = str(row[2] or "Unknown")
-                    hw_model = str(row[3] or "Unknown")
-                    role = str(row[4] or "Unknown")
-                    lat = row[5]
-                    lon = row[6]
-                    altitude = str(row[7]) if row[7] is not None else "N/A"
-                    snr = str(row[8]) if row[8] is not None else "N/A"
-                    raw_mqtt = row[9]
-                    channel = str(row[10]) if row[10] is not None else "N/A"
-                    hops = str(row[11]) if row[11] is not None else "N/A"
-                    raw_last_seen = row[12]
-                    raw_unmessagable = row[13]
-
-                    if lat and lon:
-                        location_str = get_city_state_offline(lat, lon)
-                    else:
-                        location_str = "N/A"
-                    if raw_mqtt == 1:
-                        mqtt = "True"
-                    else:
-                        mqtt = "False"
-                    if raw_last_seen:
-                        dt = datetime.fromtimestamp(float(raw_last_seen))
-                        last_seen_str = dt.strftime("%Y-%m-%d %H:%M")
-                    else:
-                        last_seen_str = "Never"
-                    if raw_unmessagable == 1:
-                        unmessagable = "True"
-                    else:
-                        unmessagable = "False"
-
-                    table.add_row(node_id, long_name, short_name, hw_model, role, location_str,
-                                  altitude, snr, mqtt, channel, hops, unmessagable, last_seen_str)
-
-                # Render the table to the console window
-                self.console_output.write(table)
+            self._node_search_command(args)
 
         elif base == "reload":
             self.console_output.write("Reloading modules...")
@@ -284,67 +208,7 @@ class BotDashboard(App):
             self.console_output.write("System reloaded.")
 
         elif base == "stats":
-            if not args:
-                self.console_output.write(
-                    "[red]Usage: stats <channels|commands|users>[/]")
-                return
-            db = self.plugin_mgr.services.get('db')
-            if not db:
-                self.console_output.write(
-                    "[bold red]Error: Database Service not loaded.[/]")
-                return
-            mesh = self.plugin_mgr.services.get('mesh')
-            if not mesh:
-                self.console_output.write(
-                    "[bold red]Error: Meshtastic Service not loaded.[/]")
-                return
-            clean_args = args[0].lower()
-            if clean_args == "channels":
-                rows = db.get_channel_usage()
-                table = Table(title="Channel Usage")
-                table.add_column("Channel", style="cyan")
-                table.add_column("Messages", style="green")
-                for row in rows:
-                    channel = str(row[0]) if row[0] is not None else "Unknown"
-                    count = str(row[1]) if row[1] is not None else "Unknown"
-                    table.add_row(channel, count)
-                self.console_output.write(table)
-            elif clean_args == "commands":
-                rows = db.get_top_commands(limit=10)
-                table = Table(title="Bot Command Usage")
-                table.add_column("Command", style="cyan")
-                table.add_column("Invocations", style="green")
-                for row in rows:
-                    command = str(row[0]) if row[0] is not None else "Unknown"
-                    count = str(row[1]) if row[1] is not None else "Unknown"
-                    table.add_row(command, count)
-                self.console_output.write(table)
-            elif clean_args == "users":
-                rows = db.get_top_talkers(limit=20)
-                table = Table(title="Top Talkers")
-                table.add_column("User", style="cyan")
-                table.add_column("Channel", style="green")
-                table.add_column("Count", style="red")
-                for row in rows:
-                    if row[0] is not None:
-                        user_id = str(row[0])
-                        user_info = db.get_node(user_id)
-                        if user_info is not None and user_info.long_name:
-                            user_id = f"{user_info.long_name} ({user_id})"
-                    else:
-                        user_id = "Unknown"
-                    if row[1] == -1:
-                        channel = "DM"
-                    elif row[1] is not None:
-                        channel = str(row[1])
-                    else:
-                        channel = "Unknown"
-                    count = str(row[2]) if row[1] is not None else "Unknown"
-                    table.add_row(user_id, channel, count)
-                self.console_output.write(table)
-            else:
-                self.console_output.write(
-                    "[red]Usage: stats <channels|commands|users>[/]")
+            self._stats_command(args)
 
         elif base == "status":
             self.console_output.write("--- STATUS REPORT ---")
@@ -368,3 +232,176 @@ class BotDashboard(App):
 
         else:
             self.console_output.write(f"[yellow]Unknown command: {base}[/]")
+
+    def _node_search_command(self, command_arguments):
+        if not command_arguments:
+            self.console_output.write(
+                "[red]Usage: node_search <name OR node_id OR city, state>[/]")
+            return
+
+        # Access the DB Service via the Plugin Manager's registry
+        db = self.plugin_mgr.services.get('db')
+        if not db:
+            self.console_output.write(
+                "[bold red]Error: Database Service not loaded.[/]")
+            return
+
+        clean_args = ' '.join(command_arguments)
+        is_location_search = False
+        target_lat, target_lon = None, None
+        if "," in clean_args or clean_args.lower().startswith("near "):
+            search_term = clean_args.replace("near ", "")
+            self.console_output.write(
+                f"Geocoding [bold cyan]'{search_term}'[/]...")
+            coords = get_lat_lon_from_string(search_term)
+            if coords:
+                target_lat, target_lon = coords
+                is_location_search = True
+                self.console_output.write(
+                    f"Searching 10mi radius around {coords}...")
+            else:
+                self.console_output.write(
+                    "[yellow]Could not find that location. Trying name search...[/]")
+
+        if is_location_search:
+            # Geo Search
+            raw_results = db.get_nodes_near(
+                target_lat, target_lon, radius_miles=10)
+            # Sort by Distance (Closest first)
+            results = []
+            for row in raw_results:
+                dist = calculate_distance(
+                    target_lat, target_lon, row[5], row[6])
+                if dist <= 10:
+                    # Append distance to the tuple for display
+                    results.append(tuple(row) + (dist,))
+            results.sort(key=lambda x: x[-1])
+        else:
+            # Standard Text Search
+            self.console_output.write(
+                f"Searching for: [bold cyan]'{clean_args}'[/]...")
+            results = db.search_nodes(clean_args, limit=20)
+
+        if not results:
+            self.console_output.write(
+                "[yellow]No matching nodes found.[/]")
+        else:
+            # Create a pretty table
+            table = Table(title=f"Search Results ({len(results)})")
+            table.add_column("Node ID", style="cyan")
+            table.add_column("Long Name", style="green")
+            table.add_column("Short", style="magenta")
+            table.add_column("Hardware", style="white")
+            table.add_column("Role", style="blue")
+            table.add_column("Location", style="red")
+            table.add_column("Altitude", style="pink1")
+            table.add_column("SNR", style="yellow")
+            table.add_column("MQTT", style="purple")
+            table.add_column("Channel", style="sky_blue2")
+            table.add_column("Hops", style="orange1")
+            table.add_column("Unmessagable", style="violet")
+            table.add_column("Time", style="grey53")
+
+            for row in results:
+                # Handle potential None values safely
+                node_id = str(row[0] or "???")
+                long_name = str(row[1] or "Unknown")
+                short_name = str(row[2] or "Unknown")
+                hw_model = str(row[3] or "Unknown")
+                role = str(row[4] or "Unknown")
+                lat = row[5]
+                lon = row[6]
+                altitude = str(row[7]) if row[7] is not None else "N/A"
+                snr = str(row[8]) if row[8] is not None else "N/A"
+                raw_mqtt = row[9]
+                channel = str(row[10]) if row[10] is not None else "N/A"
+                hops = str(row[11]) if row[11] is not None else "N/A"
+                raw_last_seen = row[12]
+                raw_unmessagable = row[13]
+
+                if lat and lon:
+                    location_str = get_city_state_offline(lat, lon)
+                else:
+                    location_str = "N/A"
+                if raw_mqtt == 1:
+                    mqtt = "True"
+                else:
+                    mqtt = "False"
+                if raw_last_seen:
+                    dt = datetime.fromtimestamp(float(raw_last_seen))
+                    last_seen_str = dt.strftime("%Y-%m-%d %H:%M")
+                else:
+                    last_seen_str = "Never"
+                if raw_unmessagable == 1:
+                    unmessagable = "True"
+                else:
+                    unmessagable = "False"
+
+                table.add_row(node_id, long_name, short_name, hw_model, role, location_str,
+                              altitude, snr, mqtt, channel, hops, unmessagable, last_seen_str)
+
+            # Render the table to the console window
+            self.console_output.write(table)
+
+    def _stats_command(self, command_arguments):
+        if not command_arguments:
+            self.console_output.write(
+                "[red]Usage: stats <channels|commands|users>[/]")
+            return
+        db = self.plugin_mgr.services.get('db')
+        if not db:
+            self.console_output.write(
+                "[bold red]Error: Database Service not loaded.[/]")
+            return
+        mesh = self.plugin_mgr.services.get('mesh')
+        if not mesh:
+            self.console_output.write(
+                "[bold red]Error: Meshtastic Service not loaded.[/]")
+            return
+        clean_args = command_arguments[0].lower()
+        if clean_args == "channels":
+            rows = db.get_channel_usage()
+            table = Table(title="Channel Usage")
+            table.add_column("Channel", style="cyan")
+            table.add_column("Messages", style="green")
+            for row in rows:
+                channel = str(row[0]) if row[0] is not None else "Unknown"
+                count = str(row[1]) if row[1] is not None else "Unknown"
+                table.add_row(channel, count)
+            self.console_output.write(table)
+        elif clean_args == "commands":
+            rows = db.get_top_commands(limit=10)
+            table = Table(title="Bot Command Usage")
+            table.add_column("Command", style="cyan")
+            table.add_column("Invocations", style="green")
+            for row in rows:
+                command = str(row[0]) if row[0] is not None else "Unknown"
+                count = str(row[1]) if row[1] is not None else "Unknown"
+                table.add_row(command, count)
+            self.console_output.write(table)
+        elif clean_args == "users":
+            rows = db.get_top_talkers(limit=20)
+            table = Table(title="Top Talkers")
+            table.add_column("User", style="cyan")
+            table.add_column("Channel", style="green")
+            table.add_column("Count", style="red")
+            for row in rows:
+                if row[0] is not None:
+                    user_id = str(row[0])
+                    user_info = db.get_node(user_id)
+                    if user_info is not None and user_info.long_name:
+                        user_id = f"{user_info.long_name} ({user_id})"
+                else:
+                    user_id = "Unknown"
+                if row[1] == -1:
+                    channel = "DM"
+                elif row[1] is not None:
+                    channel = str(row[1])
+                else:
+                    channel = "Unknown"
+                count = str(row[2]) if row[1] is not None else "Unknown"
+                table.add_row(user_id, channel, count)
+            self.console_output.write(table)
+        else:
+            self.console_output.write(
+                "[red]Usage: stats <channels|commands|users>[/]")

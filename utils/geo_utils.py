@@ -2,6 +2,7 @@ import logging
 from functools import lru_cache
 
 import reverse_geocoder as rg
+from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 
 
@@ -80,3 +81,45 @@ def get_city_state_offline(lat: float, lon: float) -> str:
                      lat, lon, e, exc_info=True)
 
     return "Unknown"
+
+
+def get_lat_lon_from_string(location_query: str) -> tuple | None:
+    """
+    Converts 'City, State' to (lat, long).
+
+    :param location_query: The location query string.
+    :type location_query: str
+    :return: The (lat, lon) tuple or None on failure.
+    :rtype: tuple[float, float] | None
+    """
+    try:
+        location = geolocator.geocode(location_query, timeout=5)
+        if location:
+            return (location.latitude, location.longitude)
+    except Exception as e:
+        logger.warning("Forward geocoding failed for '%s': %s",
+                       location_query, e)
+    return None
+
+
+def calculate_distance(origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float) -> float | None:
+    """
+    Returns distance in Miles between two points.
+
+    :param origin_lat: The latitude of the origin point.
+    :type origin_lat: float
+    :param origin_lon: The longitude of the origin point.
+    :type origin_lon: float
+    :param dest_lat: The latitude of the destination point.
+    :type dest_lat: float
+    :param dest_lon: The longitude of the destination point.
+    :type dest_lon: float
+    :return: The distance in miles, or 99999.0 on failure.
+    :rtype: float
+    """
+    try:
+        if not origin_lat or not dest_lat:
+            return None
+        return geodesic((origin_lat, origin_lon), (dest_lat, dest_lon)).miles
+    except:
+        return None
