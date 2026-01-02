@@ -10,8 +10,8 @@ class NodeSearch(BotModule):
     Command module to search for matching nodes and respond with their information.
     """
 
-    def __init__(self, name: str, config, global_services: dict, my_node: str):
-        super().__init__(name, config, global_services, my_node)
+    def __init__(self, name: str, config, root_config, global_services: dict, my_node: str):
+        super().__init__(name, config, root_config, global_services, my_node)
         if self.event_bus:
             self.event_bus.subscribe(
                 "bot.command.nodesearch", self.handle_search_request)

@@ -10,8 +10,8 @@ class NwsAlertChecker(BotModule):
 
     previous_alert_id: str | None = None
 
-    def __init__(self, name: str, config, global_services: dict, my_node: str):
-        super().__init__(name, config, global_services, my_node)
+    def __init__(self, name: str, config, root_config, global_services: dict, my_node: str):
+        super().__init__(name, config, root_config, global_services, my_node)
         # Initialize the service once when the module loads
         self.api_service = NwsWeatherService()
         self.channel: int = self.config.get('channel', 0)

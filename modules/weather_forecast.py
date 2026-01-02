@@ -9,8 +9,8 @@ class WeatherForecast(BotModule):
     Module to respond to 'forecast' commands with NWS weather forecast information.
     """
 
-    def __init__(self, name, config, global_services, my_node=None):
-        super().__init__(name, config, global_services, my_node)
+    def __init__(self, name, config, root_config, global_services, my_node=None):
+        super().__init__(name, config, root_config, global_services, my_node)
         # Initialize the geocode service
         self.geo_service = PositionstackGeocodeService()
         # Initialize the weather service

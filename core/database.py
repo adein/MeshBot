@@ -102,7 +102,54 @@ class Database:
                     channel INTEGER DEFAULT 0
                 )
             ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            ''')
             self.conn.commit()
+
+    def get_state(self, key: str, default: str | None = None) -> str | None:
+        """
+        Retrieves a value from the system_state table.
+
+        :param key: The key to look up in the system_state table.
+        :type key: str
+        :param default: The default value to return if the key is not found.
+        :type default: str | None
+        :return: The value associated with the key, or the default if not found.
+        :rtype: str | None
+        """
+        try:
+            with self.db_lock:
+                with self.conn:
+                    cursor = self.conn.execute(
+                        "SELECT value FROM system_state WHERE key=?", (key,))
+                    row = cursor.fetchone()
+                    return row[0] if row else default
+        except Exception as e:
+            self.logger.error(f"Failed to get state {key}: {e}")
+            return default
+
+    def set_state(self, key: str, value: str):
+        """
+        Saves a value to the system_state table.
+
+        :param key: The key to store in the system_state table.
+        :type key: str
+        :param value: The value to associate with the key.
+        :type value: str
+        """
+        try:
+            with self.db_lock:
+                with self.conn:
+                    self.conn.execute(
+                        "INSERT OR REPLACE INTO system_state (key, value) VALUES (?, ?)",
+                        (key, str(value))
+                    )
+        except Exception as e:
+            self.logger.error(f"Failed to set state {key}: {e}")
 
     def log_command(self, command_name: str, user_id: str):
         """

@@ -14,8 +14,8 @@ class WeatherAlerts(BotModule):
 
     local_tz: ZoneInfo | None = None
 
-    def __init__(self, name: str, config, global_services: dict, my_node: str):
-        super().__init__(name, config, global_services, my_node)
+    def __init__(self, name: str, config, root_config, global_services: dict, my_node: str):
+        super().__init__(name, config, root_config, global_services, my_node)
         # Initialize the geocode service
         self.geo_service = PositionstackGeocodeService()
         # Initialize the weather service

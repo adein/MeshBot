@@ -23,6 +23,10 @@ modules:
     interval_seconds: 1800
     zone: "LOCAL_NWS_ZONE_ID"
     channel: 7 # Channel: Should be regional - not LongFast
+  meshtastic_firmware_monitor:
+    enabled: true
+    interval_seconds: 43200
+    channel: 0
   michmesh:
     enabled: true
     interval_seconds: 0
@@ -55,6 +59,8 @@ modules:
     interval_seconds: 0
 
 services:
+  github_service:
+    api_key: "your_api_key"
   meshtastic_service:
     node_ip: "127.0.0.1"
     node_port: 4403

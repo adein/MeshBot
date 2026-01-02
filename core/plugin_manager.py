@@ -67,6 +67,7 @@ class PluginManager:
                     instance = attribute(
                         name=module_name_from_file,
                         config=mod_config,
+                        root_config=self.config,
                         global_services=self.services,
                         my_node=self.my_node_id,
                     )
