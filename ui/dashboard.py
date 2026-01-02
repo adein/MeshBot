@@ -7,6 +7,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, RichLog
 from textual import events, on
 
+from core.database import NodeInfo
 from core.event_bus import EventBus
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
@@ -280,7 +281,7 @@ class BotDashboard(App):
             # Standard Text Search
             self.console_output.write(
                 f"Searching for: [bold cyan]'{clean_args}'[/]...")
-            results = db.search_nodes(clean_args, limit=20)
+            results: list[NodeInfo] = db.search_nodes(clean_args, limit=20)
 
         if not results:
             self.console_output.write(
@@ -302,22 +303,25 @@ class BotDashboard(App):
             table.add_column("Unmessagable", style="violet")
             table.add_column("Time", style="grey53")
 
-            for row in results:
+            for node in results:
                 # Handle potential None values safely
-                node_id = str(row[0] or "???")
-                long_name = str(row[1] or "Unknown")
-                short_name = str(row[2] or "Unknown")
-                hw_model = str(row[3] or "Unknown")
-                role = str(row[4] or "Unknown")
-                lat = row[5]
-                lon = row[6]
-                altitude = str(row[7]) if row[7] is not None else "N/A"
-                snr = str(row[8]) if row[8] is not None else "N/A"
-                raw_mqtt = row[9]
-                channel = str(row[10]) if row[10] is not None else "N/A"
-                hops = str(row[11]) if row[11] is not None else "N/A"
-                raw_last_seen = row[12]
-                raw_unmessagable = row[13]
+                node_id = str(node.node_id or "???")
+                long_name = str(node.long_name or "Unknown")
+                short_name = str(node.short_name or "Unknown")
+                hw_model = str(node.hardware or "Unknown")
+                role = str(node.role or "Unknown")
+                lat = node.latitude
+                lon = node.longitude
+                altitude = str(
+                    node.altitude) if node.altitude is not None else "N/A"
+                snr = str(node.snr) if node.snr is not None else "N/A"
+                raw_mqtt = node.via_mqtt
+                channel = str(
+                    node.channel) if node.channel is not None else "N/A"
+                hops = str(
+                    node.hops_away) if node.hops_away is not None else "N/A"
+                raw_last_seen = node.last_heard
+                raw_unmessagable = node.unmessagable
 
                 if lat and lon:
                     location_str = get_city_state_offline(lat, lon)
@@ -360,46 +364,47 @@ class BotDashboard(App):
             return
         clean_args = command_arguments[0].lower()
         if clean_args == "channels":
-            rows = db.get_channel_usage()
+            channel_stats = db.get_channel_usage()
             table = Table(title="Channel Usage")
             table.add_column("Channel", style="cyan")
             table.add_column("Messages", style="green")
-            for row in rows:
-                channel = str(row[0]) if row[0] is not None else "Unknown"
-                count = str(row[1]) if row[1] is not None else "Unknown"
+            for stat in channel_stats:
+                channel = str(
+                    stat.channel) if stat.channel is not None else "Unknown"
+                count = str(
+                    stat.count) if stat.count is not None else "Unknown"
                 table.add_row(channel, count)
             self.console_output.write(table)
         elif clean_args == "commands":
-            rows = db.get_top_commands(limit=10)
+            command_stats = db.get_top_commands(limit=10)
             table = Table(title="Bot Command Usage")
             table.add_column("Command", style="cyan")
             table.add_column("Invocations", style="green")
-            for row in rows:
-                command = str(row[0]) if row[0] is not None else "Unknown"
-                count = str(row[1]) if row[1] is not None else "Unknown"
-                table.add_row(command, count)
+            for stat in command_stats:
+                table.add_row(stat.command, stat.count)
             self.console_output.write(table)
         elif clean_args == "users":
-            rows = db.get_top_talkers(limit=20)
+            talker_stats = db.get_top_talkers(limit=20)
             table = Table(title="Top Talkers")
             table.add_column("User", style="cyan")
             table.add_column("Channel", style="green")
             table.add_column("Count", style="red")
-            for row in rows:
-                if row[0] is not None:
-                    user_id = str(row[0])
+            for stat in talker_stats:
+                if stat.node_id is not None:
+                    user_id = str(stat.node_id)
                     user_info = db.get_node(user_id)
                     if user_info is not None and user_info.long_name:
                         user_id = f"{user_info.long_name} ({user_id})"
                 else:
                     user_id = "Unknown"
-                if row[1] == -1:
+                if stat.channel == -1:
                     channel = "DM"
-                elif row[1] is not None:
-                    channel = str(row[1])
+                elif stat.channel is not None:
+                    channel = str(stat.channel)
                 else:
                     channel = "Unknown"
-                count = str(row[2]) if row[1] is not None else "Unknown"
+                count = str(
+                    stat.count) if stat.count is not None else "Unknown"
                 table.add_row(user_id, channel, count)
             self.console_output.write(table)
         else:

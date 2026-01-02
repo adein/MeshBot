@@ -33,6 +33,37 @@ class NodeInfo:
     hops_away: int | None
 
 
+@dataclass
+class CommandStat:
+    """
+    Dataclass to hold command statistics.
+    """
+    __slots__ = ['command', 'count']
+    command: str
+    count: int
+
+
+@dataclass
+class UserStat:
+    """
+    Dataclass to hold user statistics.
+    """
+    __slots__ = ['node_id', 'channel', 'count']
+    node_id: str
+    channel: int
+    count: int
+
+
+@dataclass
+class ChannelStat:
+    """
+    Dataclass to hold channel statistics.
+    """
+    __slots__ = ['channel', 'count']
+    channel: int
+    count: int
+
+
 class Database:
     """
     Database service for the bot.
@@ -255,14 +286,14 @@ class Database:
         finally:
             temp_conn.close()
 
-    def get_top_commands(self, limit: int = 5) -> list[sqlite3.Row]:
+    def get_top_commands(self, limit: int = 5) -> list[CommandStat]:
         """
         Returns the most used commands.
 
         :param limit: Number of top commands to return.
         :type limit: int
-        :return: List of rows containing (command, count).
-        :rtype: list[Row]
+        :return: List of CommandStat
+        :rtype: list[CommandStat]
         """
         self.logger.debug("Retrieving top %d commands", limit)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -276,18 +307,19 @@ class Database:
                 ORDER BY count DESC 
                 LIMIT ?
             ''', (limit,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [CommandStat(command=row['command'], count=row['count']) for row in rows]
         finally:
             temp_conn.close()
 
-    def get_top_talkers(self, limit: int = 5) -> list[sqlite3.Row]:
+    def get_top_talkers(self, limit: int = 5) -> list[UserStat]:
         """
         Returns the most active users by message count.
 
         :param limit: Number of top talkers to return.
         :type limit: int
-        :return: List of rows containing (node_id, channel, count).
-        :rtype: list[Row]
+        :return: List of UserStat
+        :rtype: list[UserStat]
         """
         self.logger.debug("Retrieving top %d talkers", limit)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -301,17 +333,18 @@ class Database:
                 ORDER BY count DESC 
                 LIMIT ?
             ''', (limit,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [UserStat(node_id=row['user_id'], channel=row['channel'], count=row['count']) for row in rows]
         finally:
             temp_conn.close()
 
-    def get_channel_usage(self) -> list[sqlite3.Row]:
+    def get_channel_usage(self) -> list[ChannelStat]:
         """
         Returns the total messages per channel.
         EXCLUDES Direct Messages (channel -1).
 
-        :return: List of rows containing (channel, count).
-        :rtype: list[Row]
+        :return: List of ChannelStat
+        :rtype: list[ChannelStat]
         """
         self.logger.debug("Retrieving channel usage")
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -325,11 +358,12 @@ class Database:
                 GROUP BY channel 
                 ORDER BY count DESC
             ''')
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [ChannelStat(channel=row['channel'], count=row['count']) for row in rows]
         finally:
             temp_conn.close()
 
-    def search_nodes(self, query_text: str, limit: int = 3) -> list[sqlite3.Row]:
+    def search_nodes(self, query_text: str, limit: int = 3) -> list[NodeInfo]:
         """
         Searches for nodes matching the query string.
 
@@ -337,8 +371,8 @@ class Database:
         :type query_text: str
         :param limit: Number of results to return.
         :type limit: int
-        :return: List of rows containing node information.
-        :rtype: list[Row]
+        :return: List of NodeInfo
+        :rtype: list[NodeInfo]
         """
         self.logger.debug("Searching nodes with query: %s", query_text)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -348,7 +382,7 @@ class Database:
             clean_text = query_text.strip().lower()
             wildcard_query = f"%{clean_text}%"
             cursor.execute('''
-                SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                SELECT node_id, long_name, short_name, mac_address, hardware, role, public_key, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
                 FROM nodes 
                 WHERE lower(long_name) LIKE ? 
                    OR lower(short_name) LIKE ? 
@@ -356,14 +390,32 @@ class Database:
                    OR lower(hardware) LIKE ?
                 LIMIT ?
             ''', (wildcard_query, wildcard_query, wildcard_query, wildcard_query, limit,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [NodeInfo(
+                node_id=row['node_id'],
+                long_name=row['long_name'],
+                short_name=row['short_name'],
+                mac_address=row['mac_address'],
+                hardware=row['hardware'],
+                role=row['role'],
+                public_key=row['public_key'],
+                latitude=row['latitude'],
+                longitude=row['longitude'],
+                altitude=row['altitude'],
+                snr=row['snr'],
+                via_mqtt=row['via_mqtt'],
+                channel=row['channel'],
+                hops_away=row['hops_away'],
+                last_heard=row['last_heard'],
+                unmessagable=row['unmessagable']
+            ) for row in rows]
         except Exception as e:
             self.logger.error("Node search failed: %s", e, exc_info=True)
             return []
         finally:
             temp_conn.close()
 
-    def get_nodes_near(self, lat: float, lon: float, radius_miles: int = 20) -> list[sqlite3.Row]:
+    def get_nodes_near(self, lat: float, lon: float, radius_miles: int = 20) -> list[NodeInfo]:
         """
         Searches for nodes within roughly `radius_miles` of a point.
 
@@ -373,8 +425,8 @@ class Database:
         :type lon: float
         :param radius_miles: The radius in miles to search within.
         :type radius_miles: int
-        :return: List of rows containing node information within the radius.
-        :rtype: list[Row]
+        :return: List of NodeInfo 
+        :rtype: list[NodeInfo]
         """
         # Calculate Bounding Box (approximation for speed and simplicity)
         # 1 degree lat ~= 69 miles
@@ -392,13 +444,30 @@ class Database:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.cursor()
             cursor.execute('''
-                SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                SELECT node_id, long_name, short_name, mac_address, hardware, role, public_key, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
                 FROM nodes
                 WHERE latitude BETWEEN ? AND ?
                     AND longitude BETWEEN ? AND ?
             ''', (min_lat, max_lat, min_lon, max_lon))
             rows = cursor.fetchall()
-            return rows
+            return [NodeInfo(
+                node_id=row['node_id'],
+                long_name=row['long_name'],
+                short_name=row['short_name'],
+                mac_address=row['mac_address'],
+                hardware=row['hardware'],
+                role=row['role'],
+                public_key=row['public_key'],
+                latitude=row['latitude'],
+                longitude=row['longitude'],
+                altitude=row['altitude'],
+                snr=row['snr'],
+                via_mqtt=row['via_mqtt'],
+                channel=row['channel'],
+                hops_away=row['hops_away'],
+                last_heard=row['last_heard'],
+                unmessagable=row['unmessagable']
+            ) for row in rows]
         except Exception as e:
             self.logger.error("Geo-search failed: %s", e, exc_info=True)
             return []
