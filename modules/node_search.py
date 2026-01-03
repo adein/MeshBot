@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from core.command_dispatcher import CommandData
+from core.database import NodeInfo
 from interfaces.bot_module import BotModule
 from utils.geo_utils import get_city_state_offline, get_lat_lon_from_string, calculate_distance
 
@@ -54,35 +55,41 @@ class NodeSearch(BotModule):
                 self.logger.debug("Geocoding failed, trying name search...")
         if is_location_search:
             # Geo Search
-            raw_results = self.db.get_nodes_near(
+            raw_results: list[NodeInfo] = self.db.get_nodes_near(
                 target_lat, target_lon, radius_miles=10)
             # Sort by Distance (Closest first)
-            results = []
-            for row in raw_results:
+            temp_results: list[tuple] = []
+            for node in raw_results:
                 dist = calculate_distance(
-                    target_lat, target_lon, row[5], row[6])
+                    target_lat, target_lon, node.latitude, node.longitude)
                 if dist <= 10:
                     # Append distance to the tuple for display
-                    results.append(tuple(row) + (dist,))
-            results.sort(key=lambda x: x[-1])
+                    temp_results.append((node, dist))
+            temp_results.sort(key=lambda x: x[1])
+            results = [item[0] for item in temp_results]
         else:
             # Standard Text Search
-            results = self.db.search_nodes(query, limit=5)
+            results: list[NodeInfo] = self.db.search_nodes(query, limit=5)
         if not results:
             self.mesh_service.send_reply("No matching nodes found.", data)
         else:
             results_list = []
-            for row in results:
+            for node in results:
                 # Handle potential None values safely
-                node_id = str(row[0]) if row[0] is not None else None
-                long_name = str(row[1]) if row[1] is not None else None
-                short_name = str(row[2]) if row[2] is not None else None
-                hw_model = str(row[3]) if row[3] is not None else None
-                role = str(row[4]) if row[4] is not None else None
-                lat = row[5]
-                lon = row[6]
-                altitude = str(row[7]) if row[7] is not None else None
-                raw_last_seen = row[12]
+                node_id = str(
+                    node.node_id) if node.node_id is not None else None
+                long_name = str(
+                    node.long_name) if node.long_name is not None else None
+                short_name = str(
+                    node.short_name) if node.short_name is not None else None
+                hw_model = str(
+                    node.hardware) if node.hardware is not None else None
+                role = str(node.role) if node.role is not None else None
+                lat = node.latitude
+                lon = node.longitude
+                altitude = str(
+                    node.altitude) if node.altitude is not None else None
+                raw_last_seen = node.last_heard
 
                 if lat and lon:
                     location_str = get_city_state_offline(lat, lon)

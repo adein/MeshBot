@@ -14,7 +14,8 @@ class NodeInfo:
     """
     __slots__ = ['node_id', 'long_name', 'short_name', 'mac_address', 'hardware', 'role',
                  'public_key', 'unmessagable', 'latitude', 'longitude', 'altitude',
-                 'snr', 'last_heard', 'channel', 'via_mqtt', 'hops_away']
+                 'snr', 'last_heard', 'channel', 'via_mqtt', 'hops_away', 'battery_level',
+                 'channel_utilization', 'air_util_tx', 'uptime']
     node_id: str
     long_name: str | None
     short_name: str | None
@@ -31,6 +32,41 @@ class NodeInfo:
     channel: int | None
     via_mqtt: bool | None
     hops_away: int | None
+    battery_level: int | None
+    channel_utilization: float | None
+    air_util_tx: float | None
+    uptime: int | None
+
+
+@dataclass
+class CommandStat:
+    """
+    Dataclass to hold command statistics.
+    """
+    __slots__ = ['command', 'count']
+    command: str
+    count: int
+
+
+@dataclass
+class UserStat:
+    """
+    Dataclass to hold user statistics.
+    """
+    __slots__ = ['node_id', 'channel', 'count']
+    node_id: str
+    channel: int
+    count: int
+
+
+@dataclass
+class ChannelStat:
+    """
+    Dataclass to hold channel statistics.
+    """
+    __slots__ = ['channel', 'count']
+    channel: int
+    count: int
 
 
 class Database:
@@ -83,7 +119,9 @@ class Database:
                 hardware TEXT, role TEXT, public_key TEXT,
                 unmessagable BOOLEAN, latitude REAL, longitude REAL,
                 altitude INTEGER, snr REAL, last_heard INTEGER,
-                channel INTEGER, via_mqtt BOOLEAN, hops_away INTEGER
+                channel INTEGER, via_mqtt BOOLEAN, hops_away INTEGER,
+                battery_level INTEGER, channel_utilization REAL, air_util_tx REAL,
+                uptime INTEGER
             )
             ''')
             cursor.execute('''
@@ -202,6 +240,7 @@ class Database:
         """
         self.logger.info("Updating information for node: %s",
                          node_info.node_id)
+        self.logger.debug("Updating node information: %s", node_info)
         try:
             # Convert Dataclass to Dictionary
             # This ensures we have all keys: node_id, long_name, etc.
@@ -214,13 +253,17 @@ class Database:
                             node_id, long_name, short_name, mac_address,
                             hardware, role, public_key, unmessagable,
                             latitude, longitude, altitude, snr,
-                            last_heard, channel, via_mqtt, hops_away
+                            last_heard, channel, via_mqtt, hops_away,
+                            battery_level, channel_utilization, air_util_tx,
+                            uptime
                         )
                         VALUES (
                             :node_id, :long_name, :short_name, :mac_address,
                             :hardware, :role, :public_key, :unmessagable,
                             :latitude, :longitude, :altitude, :snr,
-                            :last_heard, :channel, :via_mqtt, :hops_away
+                            :last_heard, :channel, :via_mqtt, :hops_away,
+                            :battery_level, :channel_utilization, :air_util_tx,
+                            :uptime
                         )
                     ''', data)
 
@@ -238,7 +281,7 @@ class Database:
         :return: The NodeInfo if found, else None.
         :rtype: NodeInfo | None
         """
-        self.logger.debug("Getting information for node %s", node_id)
+        self.logger.debug("Retrieving node information for: %s", node_id)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -246,7 +289,9 @@ class Database:
                 "SELECT * FROM nodes WHERE node_id = ?", (node_id,))
             row = cursor.fetchone()
             if row:
-                return NodeInfo(**dict(row))
+                ni = NodeInfo(**dict(row))
+                self.logger.debug("Found node information %s", ni)
+                return ni
             return None
         except Exception as e:
             self.logger.error("Failed to get node %s: %s",
@@ -255,14 +300,14 @@ class Database:
         finally:
             temp_conn.close()
 
-    def get_top_commands(self, limit: int = 5) -> list[sqlite3.Row]:
+    def get_top_commands(self, limit: int = 5) -> list[CommandStat]:
         """
         Returns the most used commands.
 
         :param limit: Number of top commands to return.
         :type limit: int
-        :return: List of rows containing (command, count).
-        :rtype: list[Row]
+        :return: List of CommandStat
+        :rtype: list[CommandStat]
         """
         self.logger.debug("Retrieving top %d commands", limit)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -276,18 +321,19 @@ class Database:
                 ORDER BY count DESC 
                 LIMIT ?
             ''', (limit,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [CommandStat(command=row['command'], count=row['count']) for row in rows]
         finally:
             temp_conn.close()
 
-    def get_top_talkers(self, limit: int = 5) -> list[sqlite3.Row]:
+    def get_top_talkers(self, limit: int = 5) -> list[UserStat]:
         """
         Returns the most active users by message count.
 
         :param limit: Number of top talkers to return.
         :type limit: int
-        :return: List of rows containing (node_id, channel, count).
-        :rtype: list[Row]
+        :return: List of UserStat
+        :rtype: list[UserStat]
         """
         self.logger.debug("Retrieving top %d talkers", limit)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -301,17 +347,18 @@ class Database:
                 ORDER BY count DESC 
                 LIMIT ?
             ''', (limit,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [UserStat(node_id=row['user_id'], channel=row['channel'], count=row['count']) for row in rows]
         finally:
             temp_conn.close()
 
-    def get_channel_usage(self) -> list[sqlite3.Row]:
+    def get_channel_usage(self) -> list[ChannelStat]:
         """
         Returns the total messages per channel.
         EXCLUDES Direct Messages (channel -1).
 
-        :return: List of rows containing (channel, count).
-        :rtype: list[Row]
+        :return: List of ChannelStat
+        :rtype: list[ChannelStat]
         """
         self.logger.debug("Retrieving channel usage")
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -325,11 +372,12 @@ class Database:
                 GROUP BY channel 
                 ORDER BY count DESC
             ''')
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [ChannelStat(channel=row['channel'], count=row['count']) for row in rows]
         finally:
             temp_conn.close()
 
-    def search_nodes(self, query_text: str, limit: int = 3) -> list[sqlite3.Row]:
+    def search_nodes(self, query_text: str, limit: int = 3) -> list[NodeInfo]:
         """
         Searches for nodes matching the query string.
 
@@ -337,8 +385,8 @@ class Database:
         :type query_text: str
         :param limit: Number of results to return.
         :type limit: int
-        :return: List of rows containing node information.
-        :rtype: list[Row]
+        :return: List of NodeInfo
+        :rtype: list[NodeInfo]
         """
         self.logger.debug("Searching nodes with query: %s", query_text)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
@@ -348,7 +396,7 @@ class Database:
             clean_text = query_text.strip().lower()
             wildcard_query = f"%{clean_text}%"
             cursor.execute('''
-                SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                SELECT *
                 FROM nodes 
                 WHERE lower(long_name) LIKE ? 
                    OR lower(short_name) LIKE ? 
@@ -356,14 +404,15 @@ class Database:
                    OR lower(hardware) LIKE ?
                 LIMIT ?
             ''', (wildcard_query, wildcard_query, wildcard_query, wildcard_query, limit,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [NodeInfo(**dict(row)) for row in rows]
         except Exception as e:
             self.logger.error("Node search failed: %s", e, exc_info=True)
             return []
         finally:
             temp_conn.close()
 
-    def get_nodes_near(self, lat: float, lon: float, radius_miles: int = 20) -> list[sqlite3.Row]:
+    def get_nodes_near(self, lat: float, lon: float, radius_miles: int = 20) -> list[NodeInfo]:
         """
         Searches for nodes within roughly `radius_miles` of a point.
 
@@ -373,8 +422,8 @@ class Database:
         :type lon: float
         :param radius_miles: The radius in miles to search within.
         :type radius_miles: int
-        :return: List of rows containing node information within the radius.
-        :rtype: list[Row]
+        :return: List of NodeInfo 
+        :rtype: list[NodeInfo]
         """
         # Calculate Bounding Box (approximation for speed and simplicity)
         # 1 degree lat ~= 69 miles
@@ -392,13 +441,13 @@ class Database:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.cursor()
             cursor.execute('''
-                SELECT node_id, long_name, short_name, hardware, role, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                SELECT *
                 FROM nodes
                 WHERE latitude BETWEEN ? AND ?
                     AND longitude BETWEEN ? AND ?
             ''', (min_lat, max_lat, min_lon, max_lon))
             rows = cursor.fetchall()
-            return rows
+            return [NodeInfo(**dict(row)) for row in rows]
         except Exception as e:
             self.logger.error("Geo-search failed: %s", e, exc_info=True)
             return []

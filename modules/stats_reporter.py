@@ -49,15 +49,18 @@ class StatsReporter(BotModule):
         output = []
         self.logger.info("Handling stats command with mode: %s", mode)
         if mode == "commands":
-            rows = self.db.get_top_commands()
+            command_stats = self.db.get_top_commands()
             output.append("📊 Top Commands:")
-            for cmd, count in rows:
-                output.append(f"!{cmd}: {count}")
+            for stat in command_stats:
+                output.append(f"!{stat.command}: {stat.count}")
 
         elif mode == "users":
-            rows = self.db.get_top_talkers()
+            talker_stats = self.db.get_top_talkers()
             output.append("🗣️ Top Talkers (Channel | Count | User)")
-            for user, channel, count in rows:
+            for stat in talker_stats:
+                user = stat.node_id
+                channel = stat.channel
+                count = stat.count
                 user_display = user
                 user_info = self.db.get_node(user)
                 if user_info is not None and user_info.long_name:
@@ -70,13 +73,13 @@ class StatsReporter(BotModule):
                 output.append(f"{channel_name} | {count} | {user_display}")
 
         elif mode == "channels":
-            rows = self.db.get_channel_usage()
+            channel_stats = self.db.get_channel_usage()
             output.append("📻 Channel Usage:")
-            for channel, count in rows:
-                channel_name = self._get_channel_name(channel)
+            for stat in channel_stats:
+                channel_name = self._get_channel_name(stat.channel)
                 if channel_name is None:
-                    channel_name = f"{channel}"
-                output.append(f"{channel_name}: {count} msgs")
+                    channel_name = f"{stat.channel}"
+                output.append(f"{channel_name}: {stat.count} msgs")
 
         else:
             output.append("Usage: !stats [commands|users|channels]")
