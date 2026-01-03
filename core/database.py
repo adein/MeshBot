@@ -14,7 +14,8 @@ class NodeInfo:
     """
     __slots__ = ['node_id', 'long_name', 'short_name', 'mac_address', 'hardware', 'role',
                  'public_key', 'unmessagable', 'latitude', 'longitude', 'altitude',
-                 'snr', 'last_heard', 'channel', 'via_mqtt', 'hops_away']
+                 'snr', 'last_heard', 'channel', 'via_mqtt', 'hops_away', 'battery_level',
+                 'channel_utilization', 'air_util_tx', 'uptime']
     node_id: str
     long_name: str | None
     short_name: str | None
@@ -31,6 +32,10 @@ class NodeInfo:
     channel: int | None
     via_mqtt: bool | None
     hops_away: int | None
+    battery_level: int | None
+    channel_utilization: float | None
+    air_util_tx: float | None
+    uptime: int | None
 
 
 @dataclass
@@ -114,7 +119,9 @@ class Database:
                 hardware TEXT, role TEXT, public_key TEXT,
                 unmessagable BOOLEAN, latitude REAL, longitude REAL,
                 altitude INTEGER, snr REAL, last_heard INTEGER,
-                channel INTEGER, via_mqtt BOOLEAN, hops_away INTEGER
+                channel INTEGER, via_mqtt BOOLEAN, hops_away INTEGER,
+                battery_level INTEGER, channel_utilization REAL, air_util_tx REAL,
+                uptime INTEGER
             )
             ''')
             cursor.execute('''
@@ -246,13 +253,17 @@ class Database:
                             node_id, long_name, short_name, mac_address,
                             hardware, role, public_key, unmessagable,
                             latitude, longitude, altitude, snr,
-                            last_heard, channel, via_mqtt, hops_away
+                            last_heard, channel, via_mqtt, hops_away,
+                            battery_level, channel_utilization, air_util_tx,
+                            uptime
                         )
                         VALUES (
                             :node_id, :long_name, :short_name, :mac_address,
                             :hardware, :role, :public_key, :unmessagable,
                             :latitude, :longitude, :altitude, :snr,
-                            :last_heard, :channel, :via_mqtt, :hops_away
+                            :last_heard, :channel, :via_mqtt, :hops_away,
+                            :battery_level, :channel_utilization, :air_util_tx,
+                            :uptime
                         )
                     ''', data)
 
@@ -279,7 +290,7 @@ class Database:
             row = cursor.fetchone()
             if row:
                 ni = NodeInfo(**dict(row))
-                self.logger.debug("Found node information %s", node_id)
+                self.logger.debug("Found node information %s", ni)
                 return ni
             return None
         except Exception as e:
@@ -385,7 +396,7 @@ class Database:
             clean_text = query_text.strip().lower()
             wildcard_query = f"%{clean_text}%"
             cursor.execute('''
-                SELECT node_id, long_name, short_name, mac_address, hardware, role, public_key, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                SELECT *
                 FROM nodes 
                 WHERE lower(long_name) LIKE ? 
                    OR lower(short_name) LIKE ? 
@@ -394,24 +405,7 @@ class Database:
                 LIMIT ?
             ''', (wildcard_query, wildcard_query, wildcard_query, wildcard_query, limit,))
             rows = cursor.fetchall()
-            return [NodeInfo(
-                node_id=row['node_id'],
-                long_name=row['long_name'],
-                short_name=row['short_name'],
-                mac_address=row['mac_address'],
-                hardware=row['hardware'],
-                role=row['role'],
-                public_key=row['public_key'],
-                latitude=row['latitude'],
-                longitude=row['longitude'],
-                altitude=row['altitude'],
-                snr=row['snr'],
-                via_mqtt=row['via_mqtt'],
-                channel=row['channel'],
-                hops_away=row['hops_away'],
-                last_heard=row['last_heard'],
-                unmessagable=row['unmessagable']
-            ) for row in rows]
+            return [NodeInfo(**dict(row)) for row in rows]
         except Exception as e:
             self.logger.error("Node search failed: %s", e, exc_info=True)
             return []
@@ -447,30 +441,13 @@ class Database:
             temp_conn.row_factory = sqlite3.Row
             cursor = temp_conn.cursor()
             cursor.execute('''
-                SELECT node_id, long_name, short_name, mac_address, hardware, role, public_key, latitude, longitude, altitude, snr, via_mqtt, channel, hops_away, last_heard, unmessagable
+                SELECT *
                 FROM nodes
                 WHERE latitude BETWEEN ? AND ?
                     AND longitude BETWEEN ? AND ?
             ''', (min_lat, max_lat, min_lon, max_lon))
             rows = cursor.fetchall()
-            return [NodeInfo(
-                node_id=row['node_id'],
-                long_name=row['long_name'],
-                short_name=row['short_name'],
-                mac_address=row['mac_address'],
-                hardware=row['hardware'],
-                role=row['role'],
-                public_key=row['public_key'],
-                latitude=row['latitude'],
-                longitude=row['longitude'],
-                altitude=row['altitude'],
-                snr=row['snr'],
-                via_mqtt=row['via_mqtt'],
-                channel=row['channel'],
-                hops_away=row['hops_away'],
-                last_heard=row['last_heard'],
-                unmessagable=row['unmessagable']
-            ) for row in rows]
+            return [NodeInfo(**dict(row)) for row in rows]
         except Exception as e:
             self.logger.error("Geo-search failed: %s", e, exc_info=True)
             return []

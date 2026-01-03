@@ -296,12 +296,15 @@ class BotDashboard(App):
             table.add_column("Role", style="blue")
             table.add_column("Location", style="red")
             table.add_column("Altitude", style="pink1")
-            table.add_column("SNR", style="yellow")
-            table.add_column("MQTT", style="purple")
-            table.add_column("Channel", style="sky_blue2")
-            table.add_column("Hops", style="orange1")
             table.add_column("Unmessagable", style="violet")
-            table.add_column("Time", style="grey53")
+            table.add_column("Hops", style="orange1")
+            table.add_column("Channel", style="sky_blue2")
+            table.add_column("SNR", style="yellow")
+            table.add_column("Ch Util", style="purple3")
+            table.add_column("Battery", style="light_green")
+            table.add_column("Uptime", style="orchid")
+            table.add_column("MQTT", style="purple")
+            table.add_column("Seen", style="grey53")
 
             for node in results:
                 # Handle potential None values safely
@@ -318,8 +321,14 @@ class BotDashboard(App):
                 raw_mqtt = node.via_mqtt
                 channel = str(
                     node.channel) if node.channel is not None else "N/A"
+                channel_util = str(
+                    node.channel_utilization) if node.channel_utilization is not None else "Unknown"
                 hops = str(
                     node.hops_away) if node.hops_away is not None else "N/A"
+                battery = str(
+                    node.battery_level) if node.battery_level is not None else "N/A"
+                uptime = str(
+                    node.uptime) if node.uptime is not None else "Unknown"
                 raw_last_seen = node.last_heard
                 raw_unmessagable = node.unmessagable
 
@@ -341,8 +350,8 @@ class BotDashboard(App):
                 else:
                     unmessagable = "False"
 
-                table.add_row(node_id, long_name, short_name, hw_model, role, location_str,
-                              altitude, snr, mqtt, channel, hops, unmessagable, last_seen_str)
+                table.add_row(node_id, long_name, short_name, hw_model, role, location_str, altitude,
+                              unmessagable, hops, channel, snr, channel_util, battery, uptime, mqtt, last_seen_str)
 
             # Render the table to the console window
             self.console_output.write(table)
