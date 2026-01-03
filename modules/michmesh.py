@@ -1,5 +1,5 @@
-from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
+from models.command import CommandData
 
 
 INFO = "MichMesh setup information: https://tinyurl.com/michmesh"

@@ -7,10 +7,11 @@ from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, RichLog
 from textual import events, on
 
-from core.database import ChannelStat, CommandStat, NodeInfo, UserStat
 from core.event_bus import EventBus
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
+from models.node import NodeInfo
+from models.statistics import CommandStat, UserStat, ChannelStat
 from ui.log_handler import TextualLogHandler
 from utils.geo_utils import get_city_state_offline, get_lat_lon_from_string, calculate_distance
 

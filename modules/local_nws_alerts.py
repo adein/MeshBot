@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from interfaces.bot_module import BotModule
-from services.nws_weather_service import NwsWeatherService, WeatherAlert
+from models.weather import WeatherAlert
+from services.nws_weather_service import NwsWeatherService
 
 
 class NwsAlertChecker(BotModule):

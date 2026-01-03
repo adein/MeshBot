@@ -1,6 +1,6 @@
-from core.command_dispatcher import CommandData
-from core.database import NodeInfo
 from interfaces.bot_module import BotModule
+from models.command import CommandData
+from models.node import NodeInfo
 
 
 class Ping(BotModule):
