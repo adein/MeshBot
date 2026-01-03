@@ -1,4 +1,5 @@
 from core.command_dispatcher import CommandData
+from core.database import NodeInfo
 from interfaces.bot_module import BotModule
 
 
@@ -33,7 +34,7 @@ class Ping(BotModule):
         hops_away = data.hops_away
         message = ""
         sender = f"{from_id}"
-        node_data = self.db.get_node(from_id)
+        node_data: NodeInfo | None = self.db.get_node(from_id)
         if node_data is not None:
             if node_data.long_name is not None:
                 sender = f"{node_data.long_name}"

@@ -1,4 +1,5 @@
 from core.command_dispatcher import CommandData
+from core.database import ChannelStat, CommandStat, UserStat
 from interfaces.bot_module import BotModule
 
 
@@ -49,13 +50,13 @@ class StatsReporter(BotModule):
         output = []
         self.logger.info("Handling stats command with mode: %s", mode)
         if mode == "commands":
-            command_stats = self.db.get_top_commands()
+            command_stats: list[CommandStat] = self.db.get_top_commands()
             output.append("📊 Top Commands:")
             for stat in command_stats:
                 output.append(f"!{stat.command}: {stat.count}")
 
         elif mode == "users":
-            talker_stats = self.db.get_top_talkers()
+            talker_stats: list[UserStat] = self.db.get_top_talkers()
             output.append("🗣️ Top Talkers (Channel | Count | User)")
             for stat in talker_stats:
                 user = stat.node_id
@@ -73,7 +74,7 @@ class StatsReporter(BotModule):
                 output.append(f"{channel_name} | {count} | {user_display}")
 
         elif mode == "channels":
-            channel_stats = self.db.get_channel_usage()
+            channel_stats: list[ChannelStat] = self.db.get_channel_usage()
             output.append("📻 Channel Usage:")
             for stat in channel_stats:
                 channel_name = self._get_channel_name(stat.channel)

@@ -7,7 +7,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Input, RichLog
 from textual import events, on
 
-from core.database import NodeInfo
+from core.database import ChannelStat, CommandStat, NodeInfo, UserStat
 from core.event_bus import EventBus
 from core.plugin_manager import PluginManager
 from core.scheduler import BotScheduler
@@ -266,17 +266,18 @@ class BotDashboard(App):
 
         if is_location_search:
             # Geo Search
-            raw_results = db.get_nodes_near(
+            raw_results: list[NodeInfo] = db.get_nodes_near(
                 target_lat, target_lon, radius_miles=10)
             # Sort by Distance (Closest first)
-            results = []
-            for row in raw_results:
+            temp_results = []
+            for node in raw_results:
                 dist = calculate_distance(
-                    target_lat, target_lon, row[5], row[6])
+                    target_lat, target_lon, node.latitude, node.longitude)
                 if dist <= 10:
                     # Append distance to the tuple for display
-                    results.append(tuple(row) + (dist,))
-            results.sort(key=lambda x: x[-1])
+                    temp_results.append((node, dist))
+            temp_results.sort(key=lambda x: x[-1])
+            results = [t[0] for t in temp_results]
         else:
             # Standard Text Search
             self.console_output.write(
@@ -373,7 +374,7 @@ class BotDashboard(App):
             return
         clean_args = command_arguments[0].lower()
         if clean_args == "channels":
-            channel_stats = db.get_channel_usage()
+            channel_stats: list[ChannelStat] = db.get_channel_usage()
             table = Table(title="Channel Usage")
             table.add_column("Channel", style="cyan")
             table.add_column("Messages", style="green")
@@ -385,15 +386,15 @@ class BotDashboard(App):
                 table.add_row(channel, count)
             self.console_output.write(table)
         elif clean_args == "commands":
-            command_stats = db.get_top_commands(limit=10)
+            command_stats: list[CommandStat] = db.get_top_commands(limit=10)
             table = Table(title="Bot Command Usage")
             table.add_column("Command", style="cyan")
             table.add_column("Invocations", style="green")
             for stat in command_stats:
-                table.add_row(stat.command, stat.count)
+                table.add_row(stat.command, str(stat.count))
             self.console_output.write(table)
         elif clean_args == "users":
-            talker_stats = db.get_top_talkers(limit=20)
+            talker_stats: list[UserStat] = db.get_top_talkers(limit=20)
             table = Table(title="Top Talkers")
             table.add_column("User", style="cyan")
             table.add_column("Channel", style="green")
