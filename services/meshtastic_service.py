@@ -54,19 +54,6 @@ class TextPacket:
     is_dm: bool
 
 
-@dataclass
-class TextToSend:
-    """
-    Represents a text message to be sent via Meshtastic.
-    IMPORTANT NOTE: See notes about alerts in send_alert() method.
-    """
-    __slots__ = ['text', 'to_node_id', 'to_channel_number', 'is_alert']
-    text: str
-    to_node_id: str | None
-    to_channel_number: int | None
-    is_alert: bool
-
-
 class MeshtasticService(BotService):
     """
     Service to interact with a Meshtastic node.
@@ -376,97 +363,81 @@ class MeshtasticService(BotService):
     def _on_receive_node_update(self, node, interface):
         # Called when a node update arrives
         self.logger.debug("Received node update: %s ", node)
-        node_id: str | None = None
-        if 'user' in node and 'id' in node['user']:
-            node_id = node['user']['id']
+        user = node.get('user', {})
+        node_id = user.get('id')
+
         if node_id is None or node_id == '':
             self.logger.debug("Node ID is missing in node packet!")
             return
+
         current_info: NodeInfo | None = self.db.get_node(node_id)
         if current_info is None:
             current_info = NodeInfo(node_id, None, None, None, None, None,
                                     None, None, None, None, None, None, None, None, None, None)
-        if 'user' in node:
-            if 'longName' in node['user']:
-                current_info.long_name = node['user']['longName']
-            if 'shortName' in node['user']:
-                current_info.short_name = node['user']['shortName']
-            if 'macaddr' in node['user']:
-                current_info.mac_address = node['user']['macaddr']
-            if 'hwModel' in node['user']:
-                current_info.hardware = node['user']['hwModel']
-            if 'role' in node['user']:
-                current_info.role = node['user']['role']
-            if 'publicKey' in node['user']:
-                current_info.public_key = node['user']['publicKey']
-            if 'isUnmessagable' in node['user']:
-                current_info.unmessagable = node['user']['isUnmessagable']
-        if 'position' in node:
-            if 'altitude' in node['position']:
-                current_info.altitude = node['position']['altitude']
-            if 'latitude' in node['position']:
-                current_info.latitude = node['position']['latitude']
-            if 'longitude' in node['position']:
-                current_info.longitude = node['position']['longitude']
-        if 'viaMqtt' in node:
-            current_info.via_mqtt = node['viaMqtt']
-        if 'snr' in node and ('viaMqtt' not in node or node['viaMqtt'] is False):
-            current_info.snr = node['snr']
-        if 'lastHeard' in node:
-            current_info.last_heard = node['lastHeard']
-        if 'channel' in node:
-            current_info.channel = node['channel']
-        if 'hopsAway' in node and ('viaMqtt' not in node or node['viaMqtt'] is False):
-            current_info.hops_away = node['hopsAway']
+
+        current_info.long_name = user.get('longName', current_info.long_name)
+        current_info.short_name = user.get(
+            'shortName', current_info.short_name)
+        current_info.mac_address = user.get(
+            'macaddr', current_info.mac_address)
+        current_info.hardware = user.get('hwModel', current_info.hardware)
+        current_info.role = user.get('role', current_info.role)
+        current_info.public_key = user.get(
+            'publicKey', current_info.public_key)
+        current_info.unmessagable = user.get(
+            'isUnmessagable', current_info.unmessagable)
+
+        position = node.get('position', {})
+        current_info.altitude = position.get('altitude', current_info.altitude)
+        current_info.latitude = position.get('latitude', current_info.latitude)
+        current_info.longitude = position.get(
+            'longitude', current_info.longitude)
+
+        current_info.via_mqtt = node.get('viaMqtt', current_info.via_mqtt)
+        current_info.last_heard = node.get(
+            'lastHeard', current_info.last_heard)
+        current_info.channel = node.get('channel', current_info.channel)
+
+        if not node.get('viaMqtt', False):
+            current_info.snr = node.get('snr', current_info.snr)
+            current_info.hops_away = node.get(
+                'hopsAway', current_info.hops_away)
+
         self.db.update_node(current_info)
         self.event_bus.publish(NODE_UPDATE_TOPIC, current_info)
 
     def _on_receive_position_packet(self, packet, interface):
         # Called when a position packet arrives
         self.logger.debug("Received position packet: %s", packet)
-        if "fromId" not in packet or "decoded" not in packet or "position" not in packet["decoded"]:
+        decoded = packet.get('decoded', {})
+        position = decoded.get('position', {})
+        node_id = packet.get('fromId')
+
+        if not node_id:
             self.logger.debug(
-                "Unable to parse position packet: missing decoded or position fields")
+                "Unable to parse position packet: missing node ID")
             return
-        node_id = None
-        latitude = None
-        longitude = None
-        altitude = None
-        rx_time = None
-        rx_snr = None
-        via_mqtt = None
-        node_id = packet["fromId"]
-        if node_id is None or node_id == '':
-            self.logger.debug("Node ID is missing in position packet!")
-            return
-        if "transportMechanism" in packet:
-            via_mqtt = packet['transportMechanism'] == "TRANSPORT_MQTT"
-        if (via_mqtt is None or via_mqtt is False) and "rxSnr" in packet:
-            rx_snr = packet["rxSnr"]
-        position = packet["decoded"]["position"]
-        if "altitude" in position:
-            altitude = position["altitude"]
-        if "latitude" in position:
-            latitude = position["latitude"]
-        if "longitude" in position:
-            longitude = position["longitude"]
-        if "rxTime" in position:
-            rx_time = position["rxTime"]
+
         current_info = self.db.get_node(node_id)
         if current_info is None:
             current_info = NodeInfo(node_id, None, None, None, None, None,
                                     None, None, None, None, None, None, None, None, None, None)
-        if altitude is not None:
-            current_info.altitude = altitude
-        if latitude is not None:
-            current_info.latitude = latitude
-        if longitude is not None:
-            current_info.longitude = longitude
-        if rx_time is not None:
-            if current_info.last_heard is None or (rx_time > current_info.last_heard):
-                current_info.last_heard = rx_time
-        if rx_snr is not None:
-            current_info.snr = rx_snr
+
+        current_info.altitude = position.get('altitude', current_info.altitude)
+        current_info.latitude = position.get('latitude', current_info.latitude)
+        current_info.longitude = position.get(
+            'longitude', current_info.longitude)
+
+        rx_time = packet.get('rxTime')
+        if rx_time and (not current_info.last_heard or rx_time > current_info.last_heard):
+            current_info.last_heard = rx_time
+
+        via_mqtt = None
+        transport = packet.get('transportMechanism')
+        if transport:
+            via_mqtt = transport == "TRANSPORT_MQTT"
+        if not via_mqtt:
+            current_info.snr = packet.get('rxSnr', current_info.snr)
         if via_mqtt is not None:
             current_info.via_mqtt = via_mqtt
         self.db.update_node(current_info)
@@ -475,80 +446,58 @@ class MeshtasticService(BotService):
     def _on_receive_user_packet(self, packet, interface):
         # Called when a user packet arrives
         self.logger.debug("Received user packet: %s", packet)
-        if "decoded" not in packet or "user" not in packet["decoded"] or "id" not in packet["decoded"]["user"]:
+        decoded = packet.get('decoded', {})
+        user = decoded.get('user', {})
+        node_id = user.get('id')
+
+        if not node_id:
             self.logger.debug(
-                "Unable to parse user packet: missing decoded or user fields")
+                "Unable to parse user packet: missing node ID")
             return
-        node_id = None
-        long_name = None
-        short_name = None
-        mac_address = None
-        hardware = None
-        public_key = None
-        unmessagable = None
-        rx_time = None
-        rx_snr = None
-        user = packet["decoded"]["user"]
-        node_id = user["id"]
-        if node_id is None or node_id == '':
-            self.logger.debug("Node ID is missing in user packet!")
-            return
-        via_mqtt = True
-        if "transportMechanism" in packet:
-            via_mqtt = packet['transportMechanism'] == "TRANSPORT_MQTT"
-        if (via_mqtt is None or via_mqtt is False) and "rxSnr" in packet:
-            rx_snr = packet["rxSnr"]
-        if "longName" in user:
-            long_name = user["longName"]
-        if "shortName" in user:
-            short_name = user["shortName"]
-        if "macaddr" in user:
-            mac_address = user["macaddr"]
-        if "hwModel" in user:
-            hardware = user["hwModel"]
-        if "publicKey" in user:
-            public_key = user["publicKey"]
-        if "isUnmessagable" in user:
-            unmessagable = user["isUnmessagable"]
-        if "rxTime" in packet:
-            rx_time = packet["rxTime"]
+
         current_info = self.db.get_node(node_id)
         if current_info is None:
             current_info = NodeInfo(node_id, None, None, None, None, None,
                                     None, None, None, None, None, None, None, None, None, None)
-        if long_name is not None:
-            current_info.long_name = long_name
-        if short_name is not None:
-            current_info.short_name = short_name
-        if mac_address is not None:
-            current_info.mac_address = mac_address
-        if hardware is not None:
-            current_info.hardware = hardware
-        if public_key is not None:
-            current_info.public_key = public_key
-        if unmessagable is not None:
-            current_info.unmessagable = unmessagable
-        if rx_snr is not None:
-            current_info.snr = rx_snr
+
+        current_info.long_name = user.get('longName', current_info.long_name)
+        current_info.short_name = user.get(
+            'shortName', current_info.short_name)
+        current_info.mac_address = user.get(
+            'macaddr', current_info.mac_address)
+        current_info.hardware = user.get('hwModel', current_info.hardware)
+        current_info.public_key = user.get(
+            'publicKey', current_info.public_key)
+        current_info.unmessagable = user.get(
+            'isUnmessagable', current_info.unmessagable)
+
+        via_mqtt = None
+        transport = packet.get('transportMechanism')
+        if transport:
+            via_mqtt = transport == "TRANSPORT_MQTT"
         if via_mqtt is not None:
             current_info.via_mqtt = via_mqtt
-        if rx_time is not None:
-            if current_info.last_heard is None or (rx_time > current_info.last_heard):
-                current_info.last_heard = rx_time
+        if not via_mqtt:
+            current_info.snr = packet.get('rxSnr', current_info.snr)
+
+        rx_time = packet.get('rxTime')
+        if rx_time and (not current_info.last_heard or rx_time > current_info.last_heard):
+            current_info.last_heard = rx_time
+
         self.db.update_node(current_info)
         self.event_bus.publish(NODE_UPDATE_TOPIC, current_info)
 
     def _on_receive_text_packet(self, packet, interface):
         # Called when a text packet arrives
         self.logger.debug("Received text packet: %s", packet)
-        payload = packet.get('decoded', {})
-        text = payload.get('text', '')
-        sender_id = packet.get('fromId', '')
-        receiver_id = packet.get('toId', '')
+        decoded = packet.get('decoded', {})
+        text = decoded.get('text')
+        sender_id = packet.get('fromId')
+        receiver_id = packet.get('toId')
         try:
-            if not text:
+            if not text or not sender_id:
                 self.logger.debug(
-                    "Unable to parse text packet: missing decoded or text fields")
+                    "Unable to parse text packet: missing sender or text content")
                 return
             # Create a unique fingerprint for this message
             # We combine sender and text
@@ -576,81 +525,54 @@ class MeshtasticService(BotService):
         if channel is None and receiver_id == '^all':
             channel = 0
 
-        packet_id = None
-        sender = None
-        receiver = None
-        node_id = None
-        message = None
-        rx_time = None
-        rx_snr = None
-        hop_limit = None
-        hop_start = None
-        next_hop = None
-        relay_node = None
-        want_ack = None
-        public_key = None
-        pki_encrypted = None
         via_mqtt = None
-        packet_id = packet["id"]
-        sender = packet["from"]
-        receiver = packet["to"]
-        node_id = packet["fromId"]
-        message = packet["decoded"]["text"]
-        if "transportMechanism" in packet:
-            via_mqtt = packet['transportMechanism'] == "TRANSPORT_MQTT"
-        if "rxTime" in packet:
-            rx_time = packet["rxTime"]
-        if (via_mqtt is None or via_mqtt is False) and "rxSnr" in packet:
-            rx_snr = packet["rxSnr"]
-        if "hopLimit" in packet:
-            hop_limit = packet["hopLimit"]
-        if "hopStart" in packet:
-            hop_start = packet["hopStart"]
-        if "nextHop" in packet:
-            next_hop = packet["nextHop"]
-        if "relayNode" in packet:
-            relay_node = packet["relayNode"]
-        if "wantAck" in packet:
-            want_ack = packet["wantAck"]
-        if "publicKey" in packet:
-            public_key = packet["publicKey"]
-        if "pkiEncrypted" in packet:
-            pki_encrypted = packet["pkiEncrypted"]
+        transport = packet.get('transportMechanism')
+        if transport:
+            via_mqtt = transport == "TRANSPORT_MQTT"
+        rx_snr = packet.get('rxSnr') if not via_mqtt else None
+
         text_packet = TextPacket(
-            packet_id,
-            sender,
-            receiver,
-            node_id,
-            receiver_id,
-            message,
-            channel,
-            rx_time,
-            rx_snr,
-            hop_limit,
-            hop_start,
-            next_hop,
-            relay_node,
-            want_ack,
-            public_key,
-            pki_encrypted,
-            via_mqtt,
-            receiver_id != '^all'
+            packet_id=packet.get('id'),
+            sender=packet.get('from'),
+            receiver=packet.get('to'),
+            sender_id=sender_id,
+            receiver_id=receiver_id,
+            message=text,
+            channel=channel,
+            rx_time=packet.get('rxTime'),
+            rx_snr=rx_snr,
+            hop_limit=packet.get('hopLimit'),
+            hop_start=packet.get('hopStart'),
+            next_hop=packet.get('nextHop'),
+            relay_node=packet.get('relayNode'),
+            want_ack=packet.get('wantAck'),
+            public_key=packet.get('publicKey'),
+            pki_encrypted=packet.get('pkiEncrypted'),
+            via_mqtt=via_mqtt,
+            is_dm=(receiver_id != '^all')
         )
-        if node_id is not None and node_id != '':
-            current_info = self.db.get_node(node_id)
+
+        if sender_id:
+            current_info = self.db.get_node(sender_id)
             if current_info is None:
-                current_info = NodeInfo(node_id, None, None, None, None, None,
+                current_info = NodeInfo(sender_id, None, None, None, None, None,
                                         None, None, None, None, None, None, None, None, None, None)
+
+            # TODO: implement Hops Away
+
             if channel is not None:
                 current_info.channel = channel
-            if public_key is not None:
-                current_info.public_key = public_key
             if via_mqtt is not None:
                 current_info.via_mqtt = via_mqtt
             if rx_snr is not None:
                 current_info.snr = rx_snr
-            if rx_time is not None:
-                if current_info.last_heard is None or (rx_time > current_info.last_heard):
-                    current_info.last_heard = rx_time
+
+            current_info.public_key = packet.get(
+                'publicKey', current_info.public_key)
+
+            rx_time = packet.get('rxTime')
+            if rx_time and (not current_info.last_heard or rx_time > current_info.last_heard):
+                current_info.last_heard = rx_time
+
             self.db.update_node(current_info)
         self.event_bus.publish(TEXT_MESSAGE_TOPIC, text_packet)

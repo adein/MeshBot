@@ -233,6 +233,7 @@ class Database:
         """
         self.logger.info("Updating information for node: %s",
                          node_info.node_id)
+        self.logger.debug("Updating node information: %s", node_info)
         try:
             # Convert Dataclass to Dictionary
             # This ensures we have all keys: node_id, long_name, etc.
@@ -269,7 +270,7 @@ class Database:
         :return: The NodeInfo if found, else None.
         :rtype: NodeInfo | None
         """
-        self.logger.debug("Getting information for node %s", node_id)
+        self.logger.debug("Retrieving node information for: %s", node_id)
         temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
         try:
             temp_conn.row_factory = sqlite3.Row
@@ -277,7 +278,9 @@ class Database:
                 "SELECT * FROM nodes WHERE node_id = ?", (node_id,))
             row = cursor.fetchone()
             if row:
-                return NodeInfo(**dict(row))
+                ni = NodeInfo(**dict(row))
+                self.logger.debug("Found node information %s", node_id)
+                return ni
             return None
         except Exception as e:
             self.logger.error("Failed to get node %s: %s",
