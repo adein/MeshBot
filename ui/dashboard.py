@@ -199,7 +199,9 @@ class BotDashboard(App):
             self.console_output.write(
                 "  [cyan]help or ?[/]: Show this help message.")
             self.console_output.write(
-                "  [cyan]node_search[/]: Search the node database.")
+                "  [cyan]nodesearch[/]: Search the node database.")
+            self.console_output.write(
+                "  [cyan]rolesearch[/]: Search the node database for specific roles.")
             self.console_output.write(
                 "  [cyan]reload[/]: Reload configuration and modules.")
             self.console_output.write(
@@ -209,8 +211,11 @@ class BotDashboard(App):
             self.console_output.write(
                 "  [cyan]toggle <module_name>[/]: Enable/Disable a module.")
 
-        elif base == "node_search":
+        elif base == "nodesearch":
             self._node_search_command(args)
+
+        elif base == "rolesearch":
+            self._role_search_command(args)
 
         elif base == "reload":
             self.console_output.write("Reloading modules...")
@@ -257,7 +262,7 @@ class BotDashboard(App):
     def _node_search_command(self, command_arguments):
         if not command_arguments:
             self.console_output.write(
-                "[red]Usage: node_search <name OR node_id OR city, state>[/]")
+                "[red]Usage: nodesearch <name OR node_id OR city, state>[/]")
             return
 
         # Access the DB Service via the Plugin Manager's registry
@@ -303,6 +308,97 @@ class BotDashboard(App):
             self.console_output.write(
                 f"Searching for: [bold cyan]'{clean_args}'[/]...")
             results: list[NodeInfo] = db.search_nodes(clean_args, limit=20)
+
+        if not results:
+            self.console_output.write(
+                "[yellow]No matching nodes found.[/]")
+        else:
+            # Create a pretty table
+            table = Table(title=f"Search Results ({len(results)})")
+            table.add_column("Node ID", style="cyan")
+            table.add_column("Long Name", style="green")
+            table.add_column("Short", style="magenta")
+            table.add_column("Hardware", style="white")
+            table.add_column("Role", style="blue")
+            table.add_column("Location", style="red")
+            table.add_column("Altitude", style="pink1")
+            table.add_column("Unmessagable", style="violet")
+            table.add_column("Hops", style="orange1")
+            table.add_column("Channel", style="sky_blue2")
+            table.add_column("SNR", style="yellow")
+            table.add_column("Ch Util", style="purple3")
+            table.add_column("Battery", style="light_green")
+            table.add_column("Uptime", style="orchid")
+            table.add_column("MQTT", style="purple")
+            table.add_column("Seen", style="grey53")
+
+            for node in results:
+                # Handle potential None values safely
+                node_id = str(node.node_id or "???")
+                long_name = str(node.long_name or "Unknown")
+                short_name = str(node.short_name or "Unknown")
+                hw_model = str(node.hardware or "Unknown")
+                role = str(node.role or "Unknown")
+                lat = node.latitude
+                lon = node.longitude
+                altitude = str(
+                    node.altitude) if node.altitude is not None else "N/A"
+                snr = str(node.snr) if node.snr is not None else "N/A"
+                raw_mqtt = node.via_mqtt
+                channel = str(
+                    node.channel) if node.channel is not None else "N/A"
+                channel_util = str(
+                    node.channel_utilization) if node.channel_utilization is not None else "Unknown"
+                hops = str(
+                    node.hops_away) if node.hops_away is not None else "N/A"
+                battery = str(
+                    node.battery_level) if node.battery_level is not None else "N/A"
+                uptime = duration_to_str(
+                    node.uptime) if node.uptime is not None else "Unknown"
+                raw_last_seen = node.last_heard
+                raw_unmessagable = node.unmessagable
+
+                if lat and lon:
+                    location_str = get_city_state_offline(lat, lon)
+                else:
+                    location_str = "N/A"
+                if raw_mqtt == 1:
+                    mqtt = "True"
+                else:
+                    mqtt = "False"
+                if raw_last_seen:
+                    dt = datetime.fromtimestamp(float(raw_last_seen))
+                    last_seen_str = dt.strftime("%Y-%m-%d %H:%M")
+                else:
+                    last_seen_str = "Never"
+                if raw_unmessagable == 1:
+                    unmessagable = "True"
+                else:
+                    unmessagable = "False"
+
+                table.add_row(node_id, long_name, short_name, hw_model, role, location_str, altitude,
+                              unmessagable, hops, channel, snr, channel_util, battery, uptime, mqtt, last_seen_str)
+
+            # Render the table to the console window
+            self.console_output.write(table)
+
+    def _role_search_command(self, command_arguments):
+        if not command_arguments:
+            self.console_output.write(
+                "[red]Usage: rolesearch <role>[/]")
+            return
+
+        # Access the DB Service via the Plugin Manager's registry
+        db = self.plugin_mgr.services.get('db')
+        if not db:
+            self.console_output.write(
+                "[bold red]Error: Database Service not loaded.[/]")
+            return
+
+        clean_args = ' '.join(command_arguments)
+        self.console_output.write(
+            f"Searching for: [bold cyan]'{clean_args}'[/]...")
+        results: list[NodeInfo] = db.search_roles(clean_args, limit=20)
 
         if not results:
             self.console_output.write(
