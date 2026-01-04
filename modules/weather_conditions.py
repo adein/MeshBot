@@ -1,9 +1,10 @@
 from interfaces.bot_module import BotModule
 from models.command import CommandData
 from models.location import GpsLocation
-from models.weather import WeatherConditions
+from models.weather import WeatherConditionsData
 from services.positionstack_geocode_service import PositionstackGeocodeService
-from services.nws_weather_service import NwsWeatherService
+from services.openmeteo_weather_service import OpenMeteoWeatherService
+from utils.geo_utils import get_city_state_offline
 
 
 class WeatherConditions(BotModule):
@@ -16,7 +17,7 @@ class WeatherConditions(BotModule):
         # Initialize the geocode service
         self.geo_service = PositionstackGeocodeService()
         # Initialize the weather service
-        self.api_service = NwsWeatherService()
+        self.api_service = OpenMeteoWeatherService()
         # Listen to weather summary events
         if self.event_bus:
             self.event_bus.subscribe(
@@ -48,29 +49,25 @@ class WeatherConditions(BotModule):
             self.mesh_service.send_reply(
                 "Unable to identify the location for your query.", data)
             return
-        zone = self.api_service.get_zone(coords.latitude, coords.longitude)
-        if zone is None:
-            self.mesh_service.send_reply(
-                "Unable to identify the location for your query.", data)
-            return
-        conditions: WeatherConditions | None = self.api_service.get_conditions(zone)
+        conditions: WeatherConditionsData | None = self.api_service.get_conditions(
+            coords.latitude, coords.longitude)
         if conditions is None:
             self.mesh_service.send_reply(
                 "Unable to lookup the conditions for that location.", data)
             return
+        location: str | None = get_city_state_offline(
+            coords.latitude, coords.longitude)
 
         conditions_summary = ""
-        # First row: Location
-        if conditions.location is not None:
-            conditions_summary = "Condititions at " + conditions.location + ":\n"
+        # First row: Description of response
+        if location is not None:
+            conditions_summary = "Weather for " + location + ":\n"
         else:
-            conditions_summary = "Current condititions:\n"
+            conditions_summary = "Current weather:\n"
         # Second row: Summary
         if conditions.description is not None:
-            description_emoji = self._get_conditions_emoji(
-                conditions.description)
             conditions_summary = conditions_summary + \
-                description_emoji + conditions.description
+                conditions.description
         # Third row: Temperature/etc
         separater = "\n"
         if conditions.temperature is not None:
@@ -78,52 +75,32 @@ class WeatherConditions(BotModule):
                 "🌡️ Temperature: " + \
                 self._convert_num(conditions.temperature) + "°"
             separater = ", "
-        if conditions.wind_chill is not None:
+        if conditions.apparent_temperature is not None:
             conditions_summary = conditions_summary + separater + \
-                "🥶 Wind Chill: " + \
-                self._convert_num(conditions.wind_chill) + "°"
-            separater = ", "
-        if conditions.heat_index is not None:
-            conditions_summary = conditions_summary + separater + \
-                "🥵 Heat Index: " + \
-                self._convert_num(conditions.heat_index) + "°"
+                "👤 Feels Like: " + \
+                self._convert_num(conditions.apparent_temperature) + "°"
 
-        # Fourth row: Humidity/etc
+        # Fourth row: Wind
+        separater = "\n"
+        if conditions.wind_speed is not None:
+            conditions_summary = conditions_summary + separater + \
+                "🍃 Wind: " + self._convert_num(conditions.wind_speed) + " m/h"
+            separater = ", "
+        if conditions.wind_gusts is not None:
+            conditions_summary = conditions_summary + separater + \
+                "💨 Gusts: " + self._convert_num(conditions.wind_gusts) + " m/h"
+
+        # Fifth row: Humidity and Precipitation
         separater = "\n"
         if conditions.humidity is not None:
             conditions_summary = conditions_summary + separater + \
                 "💧 Humidity: " + self._convert_num(conditions.humidity) + "%"
             separater = ", "
-        if conditions.wind_speed is not None:
-            conditions_summary = conditions_summary + separater + \
-                "💨 Wind: " + self._convert_num(conditions.wind_speed) + " m/h"
-
-        # Fifth row: Precipitation
-        separater = "\n"
         if conditions.precipitation is not None:
             conditions_summary = conditions_summary + separater + "🌧️ Precipitation: " + \
-                self._convert_num(conditions.precipitation) + ' "'
+                self._convert_num(conditions.precipitation) + '"'
 
         self.mesh_service.send_reply(conditions_summary, data)
 
     def _convert_num(self, number) -> str:
         return f"{number:.1f}"
-
-    def _get_conditions_emoji(self, conditions: str) -> str:
-        conditions = conditions.lower()
-        if "sunny" in conditions or "clear" in conditions:
-            return "☀️ "
-        elif "partly" in conditions or "cloudy" in conditions:
-            return "⛅ "
-        elif "cloud" in conditions or "overcast" in conditions:
-            return "☁️ "
-        elif "rain" in conditions or "drizzle" in conditions:
-            return "🌧️ "
-        elif "thunder" in conditions or "storm" in conditions:
-            return "⛈️ "
-        elif "snow" in conditions or "blizzard" in conditions:
-            return "❄️ "
-        elif "fog" in conditions or "mist" in conditions:
-            return "🌫️️ "
-        else:
-            return ""

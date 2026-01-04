@@ -17,9 +17,9 @@ STATS_CMD_HELP = 'View stats about most frequenct bot commands, channel activity
 
 ALERTS_CMD_HELP = 'Get NWS alerts for your area using zip or city,state. \
     Example: !alerts detroit, mi'
-FORECAST_CMD_HELP = 'Get NWS forecast for your area using zip or city,state. \
+FORECAST_CMD_HELP = 'Get the forecast for your area using zip or city,state. \
     Example: !forecast detroit, mi'
-WEATHER_CMD_HELP = 'Get NWS current conditions from nearest weather station using \
+WEATHER_CMD_HELP = 'Get the current weather conditions for your area using \
     zip or city,state. Example: !weather 12345'
 
 

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 from pathlib import PurePosixPath
 
-from models.weather import WeatherAlert, WeatherConditions, WeatherForecast
+from models.weather import WeatherAlertData, WeatherConditionsData, WeatherForecastData
 
 
 BASE_URL = "https://api.weather.gov"
@@ -84,14 +84,14 @@ class NwsWeatherService:
 
         return None
 
-    def get_alerts(self, zone: str) -> list[WeatherAlert] | None:
+    def get_alerts(self, zone: str) -> list[WeatherAlertData] | None:
         """
         Fetches the active weather alerts.
 
         :param zone: The NWS zone ID
         :type zone: str
-        :return: A list of active WeatherAlert objects or None if no alerts are found
-        :rtype: list[WeatherAlert] | None
+        :return: A list of active WeatherAlertData objects or None if no alerts are found
+        :rtype: list[WeatherAlertData] | None
         """
         self.logger.debug("Get alerts for zone: %s", zone)
         url = f"{BASE_URL}/{ALERTS_PATH}/{zone}"
@@ -130,7 +130,7 @@ class NwsWeatherService:
                     # Alert is expired
                     self.logger.debug("Alert is expired")
                     continue
-                alert = WeatherAlert(
+                alert = WeatherAlertData(
                     alert_id, timestamp_utc, severity, headline, description, event, areas)
                 alerts.append(alert)
             return alerts
@@ -143,14 +143,14 @@ class NwsWeatherService:
             self.logger.error("General Connection Error: %s", e)
         return None
 
-    def get_conditions(self, zone: str) -> WeatherConditions | None:
+    def get_conditions(self, zone: str) -> WeatherConditionsData | None:
         """
         Fetches the weather conditions for a zoneId.
 
         :param zone: The NWS zone ID
         :type zone: str
-        :return: The current WeatherConditions or None if not available
-        :rtype: WeatherConditions | None
+        :return: The current WeatherConditionsData or None if not available
+        :rtype: WeatherConditionsData | None
         """
         self.logger.debug("Get conditions for zone: %s", zone)
         url = f"{BASE_URL}/{ZONES_PATH}/{FORECAST_PATH}/{zone}/{OBSERVATIONS_PATH}"
@@ -215,8 +215,10 @@ class NwsWeatherService:
             if 'windSpeed' in properties and 'value' in properties['windSpeed']:
                 wind_speed = self._convert_speed(
                     properties['windSpeed']['value'])
-            conditions = WeatherConditions(location, location_id, description, heat_index,
-                                           humidity, precipitation, pressure, temperature, wind_chill, wind_speed)
+            apparent_temperature = heat_index if heat_index is not None else wind_chill
+            conditions = WeatherConditionsData(location, location_id, description,
+                                               temperature, apparent_temperature, humidity,
+                                               precipitation, pressure, wind_speed, None)
             return conditions
 
         except requests.exceptions.Timeout:
@@ -227,14 +229,14 @@ class NwsWeatherService:
             self.logger.error("General Connection Error: %s", e)
         return None
 
-    def get_forecasts(self, zone: str) -> list[WeatherForecast] | None:
+    def get_forecasts(self, zone: str) -> list[WeatherForecastData] | None:
         """
         Fetches the weather forecast for a zoneId.
 
         :param zone: The NWS zone ID
         :type zone: str
-        :return: A list of WeatherForecast objects or None if not available
-        :rtype: list[WeatherForecast] | None
+        :return: A list of WeatherForecastData objects or None if not available
+        :rtype: list[WeatherForecastData] | None
         """
         self.logger.debug("Get forecasts for zone: %s", zone)
         url = f"{BASE_URL}/{ZONES_PATH}/{self.forecast_zone_type}/{zone}/{FORECAST_PATH}"
@@ -261,8 +263,21 @@ class NwsWeatherService:
                     self.logger.debug(
                         "Get forecasts period is missing required fields")
                     continue
-                forecast = WeatherForecast(
-                    current_period['name'], current_period['detailedForecast'])
+                forecast = WeatherForecastData(
+                    current_period['name'],
+                    current_period['detailedForecast'],
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                )
                 forecasts.append(forecast)
             return forecasts
 

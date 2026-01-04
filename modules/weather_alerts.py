@@ -5,7 +5,7 @@ from timezonefinder import TimezoneFinder
 from interfaces.bot_module import BotModule
 from models.command import CommandData
 from models.location import GpsLocation
-from models.weather import WeatherAlert
+from models.weather import WeatherAlertData
 from services.nws_weather_service import NwsWeatherService
 from services.positionstack_geocode_service import PositionstackGeocodeService
 
@@ -118,7 +118,7 @@ class WeatherAlerts(BotModule):
         time_zone = tf.timezone_at(lat=latitude, lng=longitude)
         return time_zone
 
-    def _process_alert(self, alert: WeatherAlert) -> str:
+    def _process_alert(self, alert: WeatherAlertData) -> str:
         expires_utc = alert.expires
         expires_local = expires_utc.astimezone(self.local_tz)
         expires_string = expires_local.strftime("%m/%d/%Y %I:%M %p")

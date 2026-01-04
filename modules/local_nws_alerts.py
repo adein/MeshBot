@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from interfaces.bot_module import BotModule
-from models.weather import WeatherAlert
+from models.weather import WeatherAlertData
 from services.nws_weather_service import NwsWeatherService
 
 
@@ -30,7 +30,7 @@ class NwsAlertChecker(BotModule):
             self.logger.error(
                 "NWS Alert Checker missing required zone configuration!")
             return
-        data: list[WeatherAlert] | None = self.api_service.get_alerts(
+        data: list[WeatherAlertData] | None = self.api_service.get_alerts(
             self.zone)
         if data is None or len(data) <= 0:
             # No alerts
@@ -64,7 +64,7 @@ class NwsAlertChecker(BotModule):
         # No valid alerts to process, so clear state data
         self.previous_alert_id = None
 
-    def _process_alert(self, alert: WeatherAlert):
+    def _process_alert(self, alert: WeatherAlertData):
         self.logger.info("Processing alert: %s", alert)
         self.previous_alert_id = alert.alert_id
         severity_emoji = self._get_severity_emoji(alert.severity)
