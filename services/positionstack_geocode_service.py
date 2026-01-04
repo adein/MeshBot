@@ -2,23 +2,13 @@ import logging
 import requests
 import yaml
 
-from dataclasses import dataclass
+from models.location import GpsLocation
 
 
 BASE_URL = "http://api.positionstack.com/v1/forward"
 API_KEY_PARAM = "access_key"
 COUNTRY_PARAM = "country"
 QUERY_PARAM = "query"
-
-
-@dataclass
-class GpsLocation:
-    """
-    Represents a GPS location with latitude and longitude.
-    """
-    __slots__ = ['latitude', 'longitude']
-    latitude: float
-    longitude: float
 
 
 class PositionstackGeocodeService:

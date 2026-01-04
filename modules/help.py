@@ -1,5 +1,5 @@
-from core.command_dispatcher import CommandData
 from interfaces.bot_module import BotModule
+from models.command import CommandData
 
 
 GENERAL_HELP = "🔧 General commands: !about, !michmesh, !nodesearch {query}, !ping, !stats {type}"

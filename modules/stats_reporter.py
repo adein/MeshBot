@@ -1,6 +1,6 @@
-from core.command_dispatcher import CommandData
-from core.database import ChannelStat, CommandStat, UserStat
 from interfaces.bot_module import BotModule
+from models.command import CommandData
+from models.statistics import CommandStat, UserStat, ChannelStat
 
 
 class StatsReporter(BotModule):

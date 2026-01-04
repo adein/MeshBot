@@ -6,7 +6,6 @@ import time
 import threading
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from pubsub import pub
 
@@ -14,12 +13,11 @@ import meshtastic
 import meshtastic.serial_interface
 import meshtastic.tcp_interface
 
-from core.database import Database, NodeInfo
+from core.database import Database
 from core.event_bus import EventBus
 from interfaces.bot_service import BotService
-
-if TYPE_CHECKING:
-    from core.command_dispatcher import CommandData
+from models.command import CommandData
+from models.node import NodeInfo
 
 
 CONNECTION_STATUS_TOPIC = "meshtastic_service.connection_status"

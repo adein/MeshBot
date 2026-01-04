@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from core.command_dispatcher import CommandData
 from timezonefinder import TimezoneFinder
+
 from interfaces.bot_module import BotModule
+from models.command import CommandData
+from models.location import GpsLocation
+from models.weather import WeatherAlert
+from services.nws_weather_service import NwsWeatherService
 from services.positionstack_geocode_service import PositionstackGeocodeService
-from services.nws_weather_service import NwsWeatherService, WeatherAlert
 
 
 class WeatherAlerts(BotModule):
@@ -46,7 +49,7 @@ class WeatherAlerts(BotModule):
             self.mesh_service.send_reply("You must provide a location.", data)
             return
         query = ' '.join(arguments)
-        coords = self.geo_service.get_coords(query)
+        coords: GpsLocation | None = self.geo_service.get_coords(query)
         if coords is None:
             self.mesh_service.send_reply(
                 "Unable to identify the location for your query.", data)
