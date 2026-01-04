@@ -10,15 +10,17 @@ class StatsReporter(BotModule):
 
     def __init__(self, name: str, config, root_config, global_services: dict, my_node: str):
         super().__init__(name, config, root_config, global_services, my_node)
+        core_config = root_config.get('core', {})
+        channels_config = core_config.get('channels', {})
         self.channel_names = {
-            0: self.config.get('channel_0_name', 'LongFast'),
-            1: self.config.get('channel_1_name', '1'),
-            2: self.config.get('channel_2_name', '2'),
-            3: self.config.get('channel_3_name', '3'),
-            4: self.config.get('channel_4_name', '4'),
-            5: self.config.get('channel_5_name', '5'),
-            6: self.config.get('channel_6_name', '6'),
-            7: self.config.get('channel_7_name', '7'),
+            0: channels_config.get('channel_0_name', 'LongFast'),
+            1: channels_config.get('channel_1_name', '1'),
+            2: channels_config.get('channel_2_name', '2'),
+            3: channels_config.get('channel_3_name', '3'),
+            4: channels_config.get('channel_4_name', '4'),
+            5: channels_config.get('channel_5_name', '5'),
+            6: channels_config.get('channel_6_name', '6'),
+            7: channels_config.get('channel_7_name', '7'),
         }
         if self.event_bus:
             self.event_bus.subscribe(
@@ -29,6 +31,8 @@ class StatsReporter(BotModule):
         pass
 
     def _get_channel_name(self, channel_id: int) -> str:
+        if channel_id == -1:
+            return "DM w/ Bot"
         return self.channel_names.get(channel_id, str(channel_id))
 
     def handle_stats_request(self, data: CommandData):
@@ -67,10 +71,6 @@ class StatsReporter(BotModule):
                 if user_info is not None and user_info.long_name:
                     user_display = user_info.long_name
                 channel_name = self._get_channel_name(channel)
-                if channel_name is None:
-                    channel_name = f"{channel}"
-                if channel == -1:
-                    channel_name = "DM w/ Bot"
                 output.append(f"{channel_name} | {count} | {user_display}")
 
         elif mode == "channels":
@@ -78,8 +78,6 @@ class StatsReporter(BotModule):
             output.append("📻 Channel Usage:")
             for stat in channel_stats:
                 channel_name = self._get_channel_name(stat.channel)
-                if channel_name is None:
-                    channel_name = f"{stat.channel}"
                 output.append(f"{channel_name}: {stat.count} msgs")
 
         else:
