@@ -393,3 +393,35 @@ class Database:
             return []
         finally:
             temp_conn.close()
+
+    def search_roles(self, query_text: str, limit: int = 3) -> list[NodeInfo]:
+        """
+        Searches for nodes with roles matching the query string.
+
+        :param query_text: The role to search for.
+        :type query_text: str
+        :param limit: Number of results to return.
+        :type limit: int
+        :return: List of NodeInfo
+        :rtype: list[NodeInfo]
+        """
+        self.logger.debug("Searching nodes with role: %s", query_text)
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
+        try:
+            temp_conn.row_factory = sqlite3.Row
+            cursor = temp_conn.cursor()
+            clean_text = query_text.strip().lower()
+            wildcard_query = f"%{clean_text}%"
+            cursor.execute('''
+                SELECT *
+                FROM nodes 
+                WHERE lower(role) LIKE ? 
+                LIMIT ?
+            ''', (wildcard_query, limit,))
+            rows = cursor.fetchall()
+            return [NodeInfo(**dict(row)) for row in rows]
+        except Exception as e:
+            self.logger.error("Role search failed: %s", e, exc_info=True)
+            return []
+        finally:
+            temp_conn.close()
