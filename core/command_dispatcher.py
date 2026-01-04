@@ -105,6 +105,7 @@ class CommandDispatcher:
             rx_time = packet.rx_time
             rx_snr = packet.rx_snr
             via_mqtt = packet.via_mqtt
+            is_dm = packet.is_dm
             hops_away = None
             if packet.hop_start is not None and packet.hop_limit is not None:
                 hops_away = packet.hop_start - packet.hop_limit
@@ -118,6 +119,7 @@ class CommandDispatcher:
                 rx_snr,
                 hops_away,
                 via_mqtt,
+                is_dm
             )
             self.event_bus.publish(command.event_topic, data)
         else:
