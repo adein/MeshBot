@@ -14,6 +14,7 @@ from models.node import NodeInfo
 from models.statistics import CommandStat, UserStat, ChannelStat
 from ui.log_handler import TextualLogHandler
 from utils.geo_utils import get_city_state_offline, get_lat_lon_from_string, calculate_distance
+from utils.time_utils import duration_to_str
 
 
 class BotDashboard(App):
@@ -63,6 +64,19 @@ class BotDashboard(App):
             highlight=True, markup=True, max_lines=1000, id="system_log")
         self.command_history: list[str] = []
         self.history_index: int = 0
+        config = self._load_config()
+        core_config = config.get('core', {})
+        channels_config = core_config.get('channels', {})
+        self.channel_names = {
+            0: channels_config.get('channel_0_name', 'LongFast'),
+            1: channels_config.get('channel_1_name', '1'),
+            2: channels_config.get('channel_2_name', '2'),
+            3: channels_config.get('channel_3_name', '3'),
+            4: channels_config.get('channel_4_name', '4'),
+            5: channels_config.get('channel_5_name', '5'),
+            6: channels_config.get('channel_6_name', '6'),
+            7: channels_config.get('channel_7_name', '7'),
+        }
 
     def _load_config(self):
         try:
@@ -235,6 +249,11 @@ class BotDashboard(App):
         else:
             self.console_output.write(f"[yellow]Unknown command: {base}[/]")
 
+    def _get_channel_name(self, channel_id: int) -> str:
+        if channel_id == -1:
+            return "DM w/ Bot"
+        return self.channel_names.get(channel_id, str(channel_id))
+
     def _node_search_command(self, command_arguments):
         if not command_arguments:
             self.console_output.write(
@@ -329,7 +348,7 @@ class BotDashboard(App):
                     node.hops_away) if node.hops_away is not None else "N/A"
                 battery = str(
                     node.battery_level) if node.battery_level is not None else "N/A"
-                uptime = str(
+                uptime = duration_to_str(
                     node.uptime) if node.uptime is not None else "Unknown"
                 raw_last_seen = node.last_heard
                 raw_unmessagable = node.unmessagable
@@ -380,11 +399,11 @@ class BotDashboard(App):
             table.add_column("Channel", style="cyan")
             table.add_column("Messages", style="green")
             for stat in channel_stats:
-                channel = str(
-                    stat.channel) if stat.channel is not None else "Unknown"
+                raw_channel = stat.channel
+                channel_name = self._get_channel_name(raw_channel)
                 count = str(
                     stat.count) if stat.count is not None else "Unknown"
-                table.add_row(channel, count)
+                table.add_row(channel_name, count)
             self.console_output.write(table)
         elif clean_args == "commands":
             command_stats: list[CommandStat] = db.get_top_commands(limit=10)
@@ -408,15 +427,11 @@ class BotDashboard(App):
                         user_id = f"{user_info.long_name} ({user_id})"
                 else:
                     user_id = "Unknown"
-                if stat.channel == -1:
-                    channel = "DM"
-                elif stat.channel is not None:
-                    channel = str(stat.channel)
-                else:
-                    channel = "Unknown"
+                raw_channel = stat.channel
+                channel_name = self._get_channel_name(raw_channel)
                 count = str(
                     stat.count) if stat.count is not None else "Unknown"
-                table.add_row(user_id, channel, count)
+                table.add_row(user_id, channel_name, count)
             self.console_output.write(table)
         else:
             self.console_output.write(

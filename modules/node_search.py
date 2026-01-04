@@ -4,6 +4,7 @@ from interfaces.bot_module import BotModule
 from models.command import CommandData
 from models.node import NodeInfo
 from utils.geo_utils import get_city_state_offline, get_lat_lon_from_string, calculate_distance
+from utils.time_utils import duration_to_str
 
 
 class NodeSearch(BotModule):
@@ -89,12 +90,17 @@ class NodeSearch(BotModule):
                 lon = node.longitude
                 altitude = str(
                     node.altitude) if node.altitude is not None else None
+                raw_uptime = node.uptime
                 raw_last_seen = node.last_heard
 
                 if lat and lon:
                     location_str = get_city_state_offline(lat, lon)
                 else:
                     location_str = None
+                if raw_uptime is not None:
+                    uptime_str = duration_to_str(int(raw_uptime))
+                else:
+                    uptime_str = None
                 if raw_last_seen:
                     dt = datetime.fromtimestamp(float(raw_last_seen))
                     last_seen_str = dt.strftime("%m-%d-%y %H:%M")
@@ -127,6 +133,9 @@ class NodeSearch(BotModule):
                     current_string = current_string + \
                         separater + f"⛰️ {altitude}"
                     separater = ", "
+                if uptime_str:
+                    current_string = current_string + \
+                        separater + f"⏳ {uptime_str}"
                 if last_seen_str:
                     current_string = current_string + \
                         separater + f"🕘 {last_seen_str}"
