@@ -1,9 +1,11 @@
 from interfaces.bot_module import BotModule
 from models.command import CommandData
 from models.location import GpsLocation
-from models.weather import WeatherForecast
+from models.weather import WeatherForecastData
+from services.openmeteo_weather_service import OpenMeteoWeatherService
 from services.positionstack_geocode_service import PositionstackGeocodeService
-from services.nws_weather_service import NwsWeatherService
+from utils.geo_utils import get_city_state_offline
+from utils.time_utils import duration_to_str
 
 
 class WeatherForecast(BotModule):
@@ -16,7 +18,7 @@ class WeatherForecast(BotModule):
         # Initialize the geocode service
         self.geo_service = PositionstackGeocodeService()
         # Initialize the weather service
-        self.api_service = NwsWeatherService()
+        self.api_service = OpenMeteoWeatherService()
         # Listen to weather summary events
         if self.event_bus:
             self.event_bus.subscribe(
@@ -48,32 +50,61 @@ class WeatherForecast(BotModule):
             self.mesh_service.send_reply(
                 "Unable to identify the location for your query.", data)
             return
-        zone = self.api_service.get_zone(coords.latitude, coords.longitude)
-        if zone is None:
-            self.mesh_service.send_reply(
-                "Unable to identify the location for your query.", data)
-            return
-        forecasts: list[WeatherForecast] | None = self.api_service.get_forecasts(
-            zone)
+        forecasts: list[WeatherForecastData] | None = self.api_service.get_forecasts(
+            coords.latitude, coords.longitude, days=2)
         if forecasts is None or len(forecasts) <= 0:
             self.mesh_service.send_reply(
                 "Unable to lookup the conditions for that location.", data)
             return
+        # location: str | None = get_city_state_offline(
+        #    coords.latitude, coords.longitude)
         forecast_summary = ""
+        separater = ""
+        # if location is not None:
+        #    forecast_summary = location + ":\n"
         for forecast in forecasts:
-            fname = forecast.name
-            desc = forecast.forecast
-            if desc is None:
-                continue
-            if len(forecast_summary) == 0:
-                if fname is not None:
-                    forecast_summary = fname + ": " + desc
-                else:
-                    forecast_summary = desc
-            elif len(forecast_summary) < 200:
-                forecast_summary = forecast_summary + "\n" + fname + ": " + desc
-        if len(forecast_summary) <= 0:
-            self.mesh_service.send_reply(
-                "Unable to lookup the forecast for that location.", data)
-            return
+            sunshine_duration = duration_to_str(int(
+                forecast.sunshine_duration)) if forecast.sunshine_duration is not None else None
+            forecast_summary = forecast_summary + forecast.day_or_time_period + ": "
+            if forecast.summary is not None:
+                forecast_summary = forecast_summary + forecast.summary + "."
+                separater = " "
+
+            if forecast.high_temperature is not None or forecast.low_temperature is not None:
+                forecast_summary = forecast_summary + separater + "🌡️ "
+                if forecast.high_temperature is not None:
+                    forecast_summary = forecast_summary + separater + \
+                        "H: " + \
+                        self._convert_num(forecast.high_temperature, 0) + "°"
+                    separater = ", "
+                if forecast.low_temperature is not None:
+                    forecast_summary = forecast_summary + separater + \
+                        "L: " + \
+                        self._convert_num(forecast.low_temperature, 0) + "°"
+
+            separater = ". "
+            if forecast.humidity is not None:
+                forecast_summary = forecast_summary + separater + \
+                    "💧 " + \
+                    self._convert_num(forecast.humidity, 0) + "%"
+                separater = ", "
+            if forecast.precipitation_probability is not None:
+                forecast_summary = forecast_summary + separater + \
+                    "🌧️ " + \
+                    self._convert_num(
+                        forecast.precipitation_probability, 0) + "%"
+                separater = ", "
+            if forecast.wind_speed is not None:
+                forecast_summary = forecast_summary + separater + \
+                    "💨 " + \
+                    self._convert_num(forecast.wind_speed, 0) + "m/h"
+                separater = ", "
+            if sunshine_duration is not None:
+                forecast_summary = forecast_summary + separater + \
+                    "☀️ " + sunshine_duration
+                separater = ","
+            forecast_summary = forecast_summary + "\n"
         self.mesh_service.send_reply(forecast_summary, data)
+
+    def _convert_num(self, number, digits: int = 1) -> str:
+        return f"{number:.{digits}f}"

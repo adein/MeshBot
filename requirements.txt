@@ -1,9 +1,12 @@
 datetime
 geopy
 meshtastic
+openmeteo_requests
 pubsub
 pyyaml
 requests
+requests-cache
+retry-requests
 reverse_geocoder
 rich
 schedule
