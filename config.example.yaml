@@ -33,11 +33,11 @@ modules:
     enabled: true
     interval_seconds: 1800
     zone: "LOCAL_NWS_ZONE_ID"
-    channel: 7 # Channel: Should be regional - not LongFast
+    channels: [7]
   meshtastic_firmware_monitor:
     enabled: true
     interval_seconds: 43200
-    channel: 0
+    channels: [0]
   michmesh:
     enabled: true
     dm_only: true

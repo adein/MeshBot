@@ -12,7 +12,7 @@ class MeshtasticFirmwareMonitor(BotModule):
         # Initialize the service once when the module loads
         self.api_service = GitHubService(root_config.get(
             'services', {}).get('github_service', {}))
-        self.channel: int = self.config.get('channel', 0)
+        self.channels: list[int] = self.config.get('channels', [])
         self.last_known_tag: str | None = self.db.get_state(
             MESHTASTIC_FIRMWARE_RELEASE_DB_KEY, None)
 
@@ -43,4 +43,8 @@ class MeshtasticFirmwareMonitor(BotModule):
             return
         self.last_known_tag = latest_tag
         message = f"🚀 New Meshtastic Firmware Release! Version: {latest_tag}\n{release.html_url}"
-        self.mesh_service.send_text(message, to_channel_number=self.channel)
+        self._send_message(message)
+
+    def _send_message(self, message: str):
+        for channel in self.channels:
+            self.mesh_service.send_text(message, to_channel_number=channel)
