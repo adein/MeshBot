@@ -48,6 +48,10 @@ class StatsReporter(BotModule):
             self.logger.debug(
                 "Stats command is missing essential message data")
             return
+        if self.is_dm_only() and not data.is_dm:
+            self.logger.debug(
+                "Stats command received in non-DM, but module is DM-only.")
+            return
 
         args = data.parameters
         mode = args[0] if args else "commands"

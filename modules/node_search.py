@@ -35,6 +35,10 @@ class NodeSearch(BotModule):
             self.logger.debug(
                 "NodeSearch command is missing essential message data")
             return
+        if self.is_dm_only() and not data.is_dm:
+            self.logger.debug(
+                "NodeSearch command received in non-DM, but module is DM-only.")
+            return
 
         arguments = data.parameters
         if arguments is None or len(arguments) <= 0:

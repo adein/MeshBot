@@ -27,6 +27,10 @@ class Ping(BotModule):
             self.logger.debug(
                 "Ping command is missing essential message data")
             return
+        if self.is_dm_only() and not data.is_dm:
+            self.logger.debug(
+                "Ping command received in non-DM, but module is DM-only.")
+            return
         self.logger.info("Handling ping command...")
         from_id = data.sender_id
         via_mqtt = data.via_mqtt

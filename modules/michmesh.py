@@ -30,5 +30,9 @@ class MichMesh(BotModule):
             self.logger.debug(
                 "MichMesh command is missing essential message data")
             return
+        if self.is_dm_only() and not data.is_dm:
+            self.logger.debug(
+                "MichMesh command received in non-DM, but module is DM-only.")
+            return
         self.logger.info("Handling michmesh command...")
         self.mesh_service.send_reply(INFO, data)

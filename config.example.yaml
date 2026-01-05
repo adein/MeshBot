@@ -21,11 +21,13 @@ logging:
 modules:
   about:
     enabled: true
+    dm_only: true
     interval_seconds: 0
     contact_email: "public_contact_email@youremail.com"
     contact_node_id: "!your_node_id_for_contact"
   help:
     enabled: true
+    dm_only: true
     interval_seconds: 0
   local_nws_alerts:
     enabled: true
@@ -38,25 +40,32 @@ modules:
     channel: 0
   michmesh:
     enabled: true
+    dm_only: true
     interval_seconds: 0
   node_search:
     enabled: true
+    dm_only: true
     interval_seconds: 0
   ping:
     enabled: true
+    dm_only: true
     interval_seconds: 0
   stats_reporter:
     enabled: true
+    dm_only: true
     interval_seconds: 0
   weather_alerts:
     enabled: true
+    dm_only: true
     interval_seconds: 0
     local_timezone: "America/Detroit"
   weather_conditions:
     enabled: true
+    dm_only: true
     interval_seconds: 0
   weather_forecast:
     enabled: true
+    dm_only: true
     interval_seconds: 0
 
 services:

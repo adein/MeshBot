@@ -37,6 +37,10 @@ class WeatherForecast(BotModule):
             self.logger.debug(
                 "Forecast command is missing essential message data")
             return
+        if self.is_dm_only() and not data.is_dm:
+            self.logger.debug(
+                "Forecast command received in non-DM, but module is DM-only.")
+            return
         # Geocode query into coordinates
         arguments = data.parameters
         self.logger.info(
