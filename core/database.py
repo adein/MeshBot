@@ -425,3 +425,34 @@ class Database:
             return []
         finally:
             temp_conn.close()
+
+    def get_top_nodes_by_altitude(self, limit: int = 5) -> list[NodeInfo]:
+        """
+        Returns the top N nodes sorted by altitude (highest first).
+        Ignores nodes with 0 or NULL altitude.
+
+        :param limit: Number of top nodes to return.
+        :type limit: int
+        :return: List of NodeInfo objects representing the top nodes by altitude.
+        :rtype: list[NodeInfo]
+        """
+        self.logger.debug("Getting top nodes by altitude...")
+        temp_conn = sqlite3.connect(self.db_path, timeout=10.0)
+        try:
+            temp_conn.row_factory = sqlite3.Row
+            cursor = temp_conn.cursor()
+            cursor.execute('''
+                SELECT *
+                FROM nodes
+                WHERE altitude IS NOT NULL AND altitude != 0
+                ORDER BY altitude DESC
+                LIMIT ?
+            ''', (limit,))
+            rows = cursor.fetchall()
+            return [NodeInfo(**dict(row)) for row in rows]
+        except Exception as e:
+            self.logger.error(
+                "Failed to get top altitude nodes: %s", e, exc_info=True)
+            return []
+        finally:
+            temp_conn.close()

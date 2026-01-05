@@ -29,6 +29,10 @@ modules:
     enabled: true
     dm_only: true
     interval_seconds: 0
+  highnodes:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
   local_nws_alerts:
     enabled: true
     interval_seconds: 1800
