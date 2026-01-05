@@ -38,3 +38,12 @@ class BotModule(ABC):
         :rtype: bool
         """
         return self.config.get('enabled', False)
+
+    def is_dm_only(self) -> bool:
+        """
+        Check if the module should respond only to DMs.
+
+        :return: True if enabled, False otherwise
+        :rtype: bool
+        """
+        return self.config.get('dm_only', False)

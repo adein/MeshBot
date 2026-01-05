@@ -41,6 +41,10 @@ class WeatherAlerts(BotModule):
             self.logger.debug(
                 "Alerts command is missing essential message data")
             return
+        if self.is_dm_only() and not data.is_dm:
+            self.logger.debug(
+                "Alerts command received in non-DM, but module is DM-only.")
+            return
         # Geocode query into coordinates
         arguments = data.parameters
         self.logger.info(

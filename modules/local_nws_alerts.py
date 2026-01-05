@@ -6,7 +6,7 @@ from services.nws_weather_service import NwsWeatherService
 
 class NwsAlertChecker(BotModule):
     """
-    Module to periodically check for NWS weather alerts and send them to a channel.
+    Module to periodically check for NWS weather alerts and send them to channels.
     """
 
     previous_alert_id: str | None = None
@@ -15,7 +15,7 @@ class NwsAlertChecker(BotModule):
         super().__init__(name, config, root_config, global_services, my_node)
         # Initialize the service once when the module loads
         self.api_service = NwsWeatherService()
-        self.channel: int = self.config.get('channel', 0)
+        self.channels: list[int] = self.config.get('channels', [])
         self.zone: str = self.config.get('zone', None)
         if self.zone is None:
             self.logger.error(
@@ -74,20 +74,15 @@ class NwsAlertChecker(BotModule):
         remaining_size = 200 - len(summary_string) - 1
         if description is not None and len(description) > 3 and remaining_size > 20:
             message = summary_string + "\n" + description[:remaining_size]
-            self.mesh_service.send_text(
-                message, to_channel_number=self.channel)
+            self._send_message(message)
         elif len(summary_string) + len(area_string) <= 199:
             message = summary_string + "\n" + area_string
-            self.mesh_service.send_text(
-                message, to_channel_number=self.channel)
+            self._send_message(message)
         elif len(summary_string) <= 200:
             message = summary_string
-            self.mesh_service.send_text(
-                message, to_channel_number=self.channel)
+            self._send_message(message)
         else:
-            message = summary_string[:200]
-            self.mesh_service.send_text(
-                message, to_channel_number=self.channel)
+            self._send_message(summary_string)
 
     def _process_description(self, description: str) -> str:
         new_description = description.replace("* WHAT...", "")
@@ -111,3 +106,7 @@ class NwsAlertChecker(BotModule):
             return "ℹ️"
         else:
             return f"({severity})"
+
+    def _send_message(self, message: str):
+        for channel in self.channels:
+            self.mesh_service.send_text(message, to_channel_number=channel)

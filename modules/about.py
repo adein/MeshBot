@@ -34,6 +34,10 @@ class About(BotModule):
             self.logger.debug(
                 "About command is missing essential message data")
             return
+        if self.is_dm_only() and not data.is_dm:
+            self.logger.debug(
+                "About command received in non-DM, but module is DM-only.")
+            return
         self.logger.info("Handling about command...")
         message_to_send = ABOUT
         contact_message = None
