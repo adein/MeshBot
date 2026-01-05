@@ -4,6 +4,7 @@ from datetime import datetime
 import yaml
 from rich.table import Table
 from textual.app import App, ComposeResult
+from textual.containers import Container
 from textual.widgets import Header, Footer, Input, RichLog
 from textual import events, on
 
@@ -22,34 +23,32 @@ class BotDashboard(App):
 
     CSS = """
     Screen {
-        layout: grid;
-        grid-size: 1 3;
-        /* Top: 60% of vertical space
-           Middle: Remaining space (approx 30-40%)
-           Bottom: EXACTLY 4 rows (3 for Input + 1 for margin)
-        */
-        grid-rows: 60% 1fr 4;
+        layout: vertical;
     }
 
+    /* Wrapper for the two log windows */
+    #main_container {
+        height: 1fr;
+        layout: vertical;
+        margin-bottom: 1; /* Safety buffer */
+    }
+
+    /* (1/3rd of the container) */
     #system_log {
-        border: solid green;
-        background: $surface;
-        height: 100%;
-    }
-
-    #console_output {
-        border: solid yellow;
-        background: $surface;
-        height: 100%;
-    }
-
-    Input {
-        /* Force height to 3 so it never shrinks */
-        height: 3; 
-        width: 100%;
+        height: 1fr;
         border: solid red;
-        
-        margin-bottom: 1;
+    }
+
+    /* (2/3rds of the container) */
+    #console_output {
+        height: 2fr;
+        border: solid green;
+    }
+
+    /* Input Bar */
+    #command_input {
+        height: 3;
+        border: wide white;
     }
     """
 
@@ -91,32 +90,39 @@ class BotDashboard(App):
         """Create the UI layout."""
         yield Header(show_clock=True)
 
-        self.system_log.border_title = "System Activity"
-        yield self.system_log
-
-        self.console_output.border_title = "Command Output"
-        yield self.console_output
+        # This container holds the split view
+        yield Container(
+            RichLog(id="system_log", markup=True, max_lines=1000),
+            RichLog(id="console_output", markup=True, max_lines=1000),
+            id="main_container"
+        )
 
         yield Input(placeholder="Type a command...", id="command_input")
         yield Footer()
 
     def on_mount(self):
         """Called when the app starts. Setup logging hook."""
-        # Assumes self.plugin_mgr.config has the root/full config dict
+        # Capture the Widgets
+        self.system_log = self.query_one("#system_log", RichLog)
+        self.console_output = self.query_one("#console_output", RichLog)
+
+        # Config & Logging Setup
         config = self.plugin_mgr.config
         log_cfg = config.get('logging', {})
+
         file_lvl_str = log_cfg.get('file_level', 'DEBUG').upper()
         ui_lvl_str = log_cfg.get('ui_level', 'INFO').upper()
         log_filename = log_cfg.get('log_file', 'bot_activity.log')
-        # Map strings to constants
+
         file_level = getattr(logging, file_lvl_str, logging.DEBUG)
         ui_level = getattr(logging, ui_lvl_str, logging.INFO)
+
         # Setup Root Logger
         root_logger = logging.getLogger()
-        # The Root logger must be the LOWEST common denominator.
         root_logger.setLevel(min(file_level, ui_level))
         root_logger.handlers.clear()
-        # Setup File Handler
+
+        # File Handler
         try:
             file_handler = logging.FileHandler(log_filename, mode='a')
             file_handler.setLevel(file_level)
@@ -126,16 +132,18 @@ class BotDashboard(App):
             root_logger.addHandler(file_handler)
         except Exception as e:
             self.console_output.write(f"[red]Failed to setup log file: {e}[/]")
-        # Setup UI Handler
+
+        # UI Handler (System Log)
         ui_handler = TextualLogHandler(self.system_log)
         ui_handler.setLevel(ui_level)
         ui_fmt = logging.Formatter('%(asctime)s - %(message)s')
         ui_handler.setFormatter(ui_fmt)
         root_logger.addHandler(ui_handler)
+
         # Silence Noise
         logging.getLogger("asyncio").setLevel(logging.WARNING)
         logging.getLogger("urllib3").setLevel(logging.WARNING)
-        # Announce Ready
+
         self.console_output.write(
             f"[bold yellow]Logging Initialized (File: {file_lvl_str}, UI: {ui_lvl_str}).[/]")
         self.console_output.write(
