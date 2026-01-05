@@ -8,7 +8,6 @@ from dataclasses import dataclass
 BASE_URL = "https://api.github.com"
 REPO_PATH = "repos"
 LATEST_RELEASE_PATH = "releases/latest"
-REPO_TO_MONITOR = "meshtastic/firmware"
 HEADERS = {
     'Accept': 'application/vnd.github.v3+json',
     'User-Agent': 'MeshBot/1.0'
@@ -39,7 +38,7 @@ class GitHubService():
         else:
             self.logger.error("GitHub Service initialized (Anonymous mode).")
 
-    def get_latest_release(self, repo_slug: str = REPO_TO_MONITOR) -> GitHubRelease | None:
+    def get_latest_release(self, repo_slug: str) -> GitHubRelease | None:
         """
         Fetches the latest release metadata for a repo.
 

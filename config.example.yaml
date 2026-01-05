@@ -34,6 +34,10 @@ modules:
     interval_seconds: 1800
     zone: "LOCAL_NWS_ZONE_ID"
     channels: [7]
+  meshtastic_app_monitor:
+    enabled: true
+    interval_seconds: 43200
+    channels: [0]
   meshtastic_firmware_monitor:
     enabled: true
     interval_seconds: 43200

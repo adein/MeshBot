@@ -1,8 +1,11 @@
+import time
+
 from interfaces.bot_module import BotModule
 from services.github_service import GitHubService, GitHubRelease
 
 
 MESHTASTIC_FIRMWARE_RELEASE_DB_KEY = 'meshtastic_firmware_last_release'
+FW_REPO = "meshtastic/firmware"
 
 
 class MeshtasticFirmwareMonitor(BotModule):
@@ -21,7 +24,8 @@ class MeshtasticFirmwareMonitor(BotModule):
             self.logger.error(
                 "Meshtastic Firmware Monitor triggered, but module is disabled. This shouldn't happen.")
             return
-        release: GitHubRelease | None = self.api_service.get_latest_release()
+        release: GitHubRelease | None = self.api_service.get_latest_release(
+            repo_slug=FW_REPO)
         if release is None or release.tag_name is None:
             self.logger.debug(
                 "Failed to fetch latest Meshtastic firmware release info.")
@@ -39,6 +43,8 @@ class MeshtasticFirmwareMonitor(BotModule):
         self.db.set_state(MESHTASTIC_FIRMWARE_RELEASE_DB_KEY, latest_tag)
         if self.last_known_tag is None:
             # First run, don't notify
+            self.logger.info(
+                "First run of firmware monitor, not sending notification.")
             self.last_known_tag = latest_tag
             return
         self.last_known_tag = latest_tag
@@ -48,3 +54,4 @@ class MeshtasticFirmwareMonitor(BotModule):
     def _send_message(self, message: str):
         for channel in self.channels:
             self.mesh_service.send_text(message, to_channel_number=channel)
+            time.sleep(2)
