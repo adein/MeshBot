@@ -93,4 +93,4 @@ class MeshtasticAppMonitor(BotModule):
     def _send_message(self, message: str):
         for channel in self.channels:
             self.mesh_service.send_text(message, to_channel_number=channel)
-            time.sleep(2)
+            time.sleep(4)

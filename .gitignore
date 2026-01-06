@@ -213,4 +213,5 @@ bot_activity.log*
 *.db
 *.db-shm
 *.db-wal
+.cache_weather.sqlite
 

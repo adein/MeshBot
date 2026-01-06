@@ -1,3 +1,5 @@
+import time
+
 from datetime import datetime, timezone
 from interfaces.bot_module import BotModule
 from models.weather import WeatherAlertData
@@ -111,3 +113,4 @@ class NwsAlertChecker(BotModule):
     def _send_message(self, message: str):
         for channel in self.channels:
             self.mesh_service.send_text(message, to_channel_number=channel)
+            time.sleep(4)
