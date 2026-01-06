@@ -85,12 +85,13 @@ class NwsAlertChecker(BotModule):
             self._send_message(summary_string)
 
     def _process_description(self, description: str) -> str:
-        new_description = description.replace("* WHAT...", "")
-        new_description = new_description.replace("* WHERE...", "")
-        new_description = new_description.replace("* WHEN...", "")
-        new_description = new_description.replace("* IMPACTS...", "")
+        new_description = description.replace("WHAT...", "")
+        new_description = new_description.replace("WHERE...", "")
+        new_description = new_description.replace("WHEN...", "")
+        new_description = new_description.replace("IMPACTS...", "")
+        new_description = new_description.replace("WEATHER...", "")
         new_description = new_description.replace(
-            "* ADDITIONAL DETAILS...", "")
+            "ADDITIONAL DETAILS...", "")
         new_description = new_description.replace("\n\n", "\n")
         return new_description
 

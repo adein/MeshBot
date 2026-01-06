@@ -99,8 +99,9 @@ class WeatherAlerts(BotModule):
             expires_string = expires_local.strftime("%m/%d/%Y %I:%M %p")
             alert_emoji = self._get_severity_emoji(alert.severity)
             alert_prefix = "NWS Alert " + alert_emoji + ": "
-            if len(alert_prefix) + len(alert.description) <= 200:
-                alert_summary = alert_prefix + alert.description
+            processed_description = self._process_description(alert.description)
+            if len(alert_prefix) + len(processed_description) <= 200:
+                alert_summary = alert_prefix + processed_description
             elif len(alert_prefix) + len(alert.headline) + 11 + len(expires_string) <= 200:
                 alert_summary = alert_prefix + alert.headline + ". Expires: " + expires_string
             else:
@@ -128,6 +129,17 @@ class WeatherAlerts(BotModule):
         expires_string = expires_local.strftime("%m/%d/%Y %I:%M %p")
         return alert.headline + ". Expires: " + expires_string
 
+    def _process_description(self, description: str) -> str:
+        new_description = description.replace("WHAT...", "")
+        new_description = new_description.replace("WHERE...", "")
+        new_description = new_description.replace("WHEN...", "")
+        new_description = new_description.replace("IMPACTS...", "")
+        new_description = new_description.replace("WEATHER...", "")
+        new_description = new_description.replace(
+            "ADDITIONAL DETAILS...", "")
+        new_description = new_description.replace("\n\n", "\n")
+        return new_description
+
     def _get_severity_emoji(self, severity: str) -> str:
         severity_lower = severity.lower()
         if severity_lower == "extreme" or severity_lower == "urgent":
@@ -140,3 +152,4 @@ class WeatherAlerts(BotModule):
             return "ℹ️"
         else:
             return f"({severity})"
+
