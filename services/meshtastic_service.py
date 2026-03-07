@@ -242,18 +242,13 @@ class MeshtasticService(BotService):
 
     def _send_alert_to_node(self, alert: str, node_id: str):
         """
-        Sends an alert to a node, splitting the alert if necessary to keep each part within size limits.
+        Sends an alert to a node, truncating if necessary to keep it within size limits.
 
         :param alert: The alert to send
         :type alert: str
         :param node_id: The destination node ID
         :type node_id: str
         """
-        # Split the alert if necessary, sending up to 2 parts
-        # alert_chunks = self._split_text_by_bytes(alert, limit=200)[:2]
-        # for chunk in alert_chunks:
-        #    self.interface.sendAlert(text=chunk, destinationId=node_id)
-        # Above does not seem to work - Fallback to truncation for now
         alert_to_send = self._truncate_by_bytes(alert, 200)
         self.interface.sendAlert(text=alert_to_send, destinationId=node_id)
 
@@ -271,19 +266,13 @@ class MeshtasticService(BotService):
 
     def _send_text_to_node(self, message: str, node_id: str):
         """
-        Sends a message to a node, splitting the message if necessary to keep each part within size limits.
+        Sends a message to a node, truncating if necessary to keep it within size limits.
 
         :param message: The message to send
         :type message: str
         :param node_id: The destination node ID
         :type node_id: str
         """
-        # Split the message if necessary, sending up to 2 parts
-        # message_chunks = self._split_text_by_bytes(message, limit=200)[:2]
-        # for chunk in message_chunks:
-        #    self.interface.sendText(
-        #        text=chunk, destinationId=node_id, wantAck=True)
-        # Above does not seem to work - Fallback to truncation for now
         message_to_send = self._truncate_by_bytes(message, 200)
         self.interface.sendText(text=message_to_send, destinationId=node_id)
 

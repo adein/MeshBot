@@ -4,7 +4,6 @@ from models.location import GpsLocation
 from models.weather import WeatherForecastData
 from services.openmeteo_weather_service import OpenMeteoWeatherService
 from services.positionstack_geocode_service import PositionstackGeocodeService
-from utils.geo_utils import get_city_state_offline
 from utils.time_utils import duration_to_str
 
 
@@ -60,12 +59,8 @@ class WeatherForecast(BotModule):
             self.mesh_service.send_reply(
                 "Unable to lookup the conditions for that location.", data)
             return
-        # location: str | None = get_city_state_offline(
-        #    coords.latitude, coords.longitude)
         forecast_summary = ""
         separater = ""
-        # if location is not None:
-        #    forecast_summary = location + ":\n"
         for forecast in forecasts:
             sunshine_duration = duration_to_str(int(
                 forecast.sunshine_duration)) if forecast.sunshine_duration is not None else None

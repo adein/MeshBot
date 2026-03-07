@@ -14,7 +14,7 @@ core:
     channel_7_name: "YourChannel7"
 
 logging:
-  file_level: "DEBUG"
+  file_level: "INFO"
   ui_level: "INFO"
   log_file: "bot_activity.log"
 
