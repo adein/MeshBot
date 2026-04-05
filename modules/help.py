@@ -3,7 +3,7 @@ from models.command import CommandData
 
 
 GENERAL_HELP = "🔧 General commands: !about, !michmesh, !nodesearch {query}, !ping, !stats {type}"
-WEATHER_HELP = "🌤️ Weather commands: !alerts {location}, !forecast {location}, !weather {location}"
+WEATHER_HELP = "🌤️ Weather commands: !alerts {location}, !aqi {location}, !forecast {location}, !weather {location}"
 HELP_ERROR = '❗️ Unknown command. Try "!help" or "!help command"'
 
 ABOUT_CMD_HELP = 'Get information about this bot or how to get in contact with the owner'
@@ -21,6 +21,8 @@ FORECAST_CMD_HELP = 'Get the forecast for your area using zip or city,state. \
     Example: !forecast detroit, mi'
 WEATHER_CMD_HELP = 'Get the current weather conditions for your area using \
     zip or city,state. Example: !weather 12345'
+AQI_CMD_HELP = 'Get the current air quality for your area using \
+    zip or city,state. Example: !aqi 12345'
 
 
 class Help(BotModule):
@@ -61,6 +63,8 @@ class Help(BotModule):
             help_subcommand = arguments[0].removeprefix('!')
             if help_subcommand == "about":
                 self.mesh_service.send_reply(ABOUT_CMD_HELP, data)
+            elif help_subcommand == "aqi":
+                self.mesh_service.send_reply(AQI_CMD_HELP, data)
             elif help_subcommand == "michmesh":
                 self.mesh_service.send_reply(MICHMESH_CMD_HELP, data)
             elif help_subcommand == "nodesearch":
