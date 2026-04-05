@@ -84,7 +84,8 @@ class AirQualityChecker(BotModule):
         aqi_emoji = self.api_service.get_aqi_emoji(data.aqi)
         summary = "Air Quality Alert: "
         if data.city is not None and data.city.name is not None:
-            summary = f"Air Quality Alert for {data.city.name}: "
+            location = data.city.name.removesuffix(", USA")
+            summary = f"Air Quality Alert for {location}: "
         summary += f"{aqi_emoji} {aqi_description} {data.aqi}"
         if data.forecast is not None and data.forecast.daily is not None:
             forecast_summary = self.api_service.get_todays_forecast_summary(
