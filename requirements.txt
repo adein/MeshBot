@@ -1,0 +1,14 @@
+geopy
+meshtastic
+openmeteo_requests
+pubsub
+pytest
+pyyaml
+requests
+requests-cache
+retry-requests
+reverse_geocoder
+rich
+schedule
+textual
+timezonefinder

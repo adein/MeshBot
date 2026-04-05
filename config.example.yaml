@@ -1,0 +1,104 @@
+core:
+  my_node_id: "!your_node_id"
+  dedup_window: 10.0
+  database:
+    db_path: "meshbot_data.db"
+  channels:
+    channel_0_name: "LongFast"
+    channel_1_name: "YourChannel1"
+    channel_2_name: "YourChannel2"
+    channel_3_name: "YourChannel3"
+    channel_4_name: "YourChannel4"
+    channel_5_name: "YourChannel5"
+    channel_6_name: "YourChannel6"
+    channel_7_name: "YourChannel7"
+
+logging:
+  file_level: "INFO"
+  ui_level: "INFO"
+  log_file: "bot_activity.log"
+
+modules:
+  about:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+    contact_email: "public_contact_email@youremail.com"
+    contact_node_id: "!your_node_id_for_contact"
+  air_quality:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  help:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  highnodes:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  local_aqi_alerts:
+    enabled: true
+    interval_seconds: 1800
+    latitude: LOCAL_AQI_LATITUDE
+    longitude: LOCAL_AQI_LONGITUDE
+    aqi_threshold: 100
+    channels: [7]
+  local_nws_alerts:
+    enabled: true
+    interval_seconds: 1800
+    zone: "LOCAL_NWS_ZONE_ID"
+    channels: [7]
+  meshtastic_app_monitor:
+    enabled: true
+    interval_seconds: 43200
+    channels: [0]
+  meshtastic_firmware_monitor:
+    enabled: true
+    interval_seconds: 43200
+    channels: [0]
+  michmesh:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  node_search:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  ping:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  stats_reporter:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  weather_alerts:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+    local_timezone: "America/Detroit"
+  weather_conditions:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+  weather_forecast:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
+
+services:
+  aqicn_service:
+    api_key: "your_api_key"
+  github_service:
+    api_key: "your_api_key"
+  meshtastic_service:
+    node_ip: "127.0.0.1"
+    node_port: 4403
+    reconnect_base_delay: 5
+    reconnect_max_delay: 300
+  nws_weather_service:
+    forecast_zone_type: "land"
+  positionstack_geocode_service:
+    api_key: "your_api_key"
+    country_limit: "US"
