@@ -25,6 +25,10 @@ modules:
     interval_seconds: 0
     contact_email: "public_contact_email@youremail.com"
     contact_node_id: "!your_node_id_for_contact"
+  aqi:
+    enabled: true
+    dm_only: true
+    interval_seconds: 0
   help:
     enabled: true
     dm_only: true
@@ -33,6 +37,13 @@ modules:
     enabled: true
     dm_only: true
     interval_seconds: 0
+  local_aqi_alerts:
+    enabled: true
+    interval_seconds: 1800
+    latitude: LOCAL_AQI_LATITUDE
+    longitude: LOCAL_AQI_LONGITUDE
+    aqi_threshold: 100
+    channels: [7]
   local_nws_alerts:
     enabled: true
     interval_seconds: 1800
@@ -77,6 +88,8 @@ modules:
     interval_seconds: 0
 
 services:
+  aqicn_service:
+    api_key: "your_api_key"
   github_service:
     api_key: "your_api_key"
   meshtastic_service:
