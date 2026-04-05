@@ -73,7 +73,8 @@ class AirQuality(BotModule):
             return
         summary = "Air Quality"
         if air_quality.city is not None and air_quality.city.name is not None:
-            summary += f" in {air_quality.city.name}:"
+            location = air_quality.city.name.removesuffix(", USA")
+            summary += f" in {location}:"
         else:
             summary += ":"
         if air_quality.aqi is not None:
