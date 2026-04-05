@@ -66,6 +66,8 @@ services:
 
 ```yaml
 services:
+  aqicn_service:
+    api_key: "your_api_key"
   github_service:
     api_key: "your_github_pat"       # GitHub personal access token
   positionstack_geocode_service:
@@ -95,6 +97,7 @@ Users interact with MeshBot by sending `!command` messages either as direct mess
 |---------|-------------|---------|
 | `!ping` | Test connectivity. Responds with signal info (SNR, hops). | `!ping` |
 | `!about` | Show bot info and contact details. | `!about` |
+| `!aqi <location>` | Current air quality for a location. | `!aqi Detroit` |
 | `!help` | List available commands. | `!help` |
 | `!weather <location>` | Current weather conditions for a location. | `!weather Detroit, MI` |
 | `!forecast <location>` | 2-day weather forecast for a location. | `!forecast Ann Arbor` |
@@ -114,6 +117,7 @@ These modules run on a schedule and push messages to configured channels without
 
 | Module | Description | Default Interval |
 |--------|-------------|-----------------|
+| `local_aqi_alerts` | Polls the AQICN API for AQI alerts at a location and posts them to a channel. | Every 30 minutes |
 | `local_nws_alerts` | Polls the NWS API for active alerts in a configured zone and posts them to a channel. | Every 30 minutes |
 | `meshtastic_firmware_monitor` | Checks GitHub for new Meshtastic firmware releases and announces them. | Every 12 hours |
 | `meshtastic_app_monitor` | Checks for new Meshtastic Android and iOS app releases and announces them. | Every 12 hours |

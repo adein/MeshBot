@@ -2,6 +2,7 @@ geopy
 meshtastic
 openmeteo_requests
 pubsub
+pytest
 pyyaml
 requests
 requests-cache
