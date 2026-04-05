@@ -4,6 +4,7 @@ import yaml
 
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 from models.air_quality import AirQualityData, AirQualityCityData, AirQualityCurrentMeasurementData, AirQualityTimeData, AirQualityForecastData, AirQualityDailyForecastData, AirQualityForecastItemData
 
@@ -96,7 +97,8 @@ class AirQualityService:
                     wg=iaqi_data.get('wg', {}).get('v')
                 )
             else:
-                self.logger.warning("Air quality is missing current measurement information")
+                self.logger.warning(
+                    "Air quality is missing current measurement information")
             if 'time' in data:
                 time_data = data['time']
                 time = AirQualityTimeData(
@@ -135,7 +137,8 @@ class AirQualityService:
                 )
                 forecast = AirQualityForecastData(daily=daily_forecast)
             else:
-                self.logger.warning("Air quality is missing forecast information")
+                self.logger.warning(
+                    "Air quality is missing forecast information")
             return AirQualityData(
                 aqi=aqi,
                 city=city,
@@ -151,3 +154,70 @@ class AirQualityService:
         except requests.exceptions.RequestException as e:
             self.logger.error("General Connection Error: %s", e)
         return None
+
+    def get_aqi_level(self, aqi: int) -> int:
+        if aqi <= 50:
+            return 0
+        elif aqi <= 100:
+            return 1
+        elif aqi <= 150:
+            return 2
+        elif aqi <= 200:
+            return 3
+        elif aqi <= 300:
+            return 4
+        else:
+            return 5
+
+    def get_aqi_description(self, aqi: int) -> str:
+        if aqi <= 50:
+            return "Good"
+        elif aqi <= 100:
+            return "Moderate"
+        elif aqi <= 150:
+            return "Unhealthy for Sensitive Groups"
+        elif aqi <= 200:
+            return "Unhealthy"
+        elif aqi <= 300:
+            return "Very Unhealthy"
+        else:
+            return "Hazardous"
+
+    def get_aqi_emoji(self, aqi: int) -> str:
+        if aqi <= 50:
+            return "🟢"
+        elif aqi <= 100:
+            return "🟡"
+        elif aqi <= 150:
+            return "🟠"
+        elif aqi <= 200:
+            return "🔴"
+        elif aqi <= 300:
+            return "🟣"
+        else:
+            return "🟤"
+
+    def format_forecast_item(self, label: str, item: AirQualityForecastItemData) -> str:
+        description = ""
+        emoji = ""
+        if item.avg is not None:
+            description = self.get_aqi_description(item.avg)
+            emoji = self.get_aqi_emoji(item.avg)
+        result = f"{label}: {description} {item.avg} {emoji}"
+        if item.min is not None and item.max is not None:
+            result += f" (min {item.min}, max {item.max})"
+        return result + "\n"
+
+    def get_todays_forecast_summary(self, localTz: ZoneInfo, forecast: AirQualityDailyForecastData) -> str:
+        today = datetime.now(localTz).strftime(
+            "%Y-%m-%d") if localTz else datetime.now().strftime("%Y-%m-%d")
+        summary = ""
+        if forecast.pm25 is not None:
+            item = next((i for i in forecast.pm25 if i.day == today), None)
+            if item is not None and item.avg is not None:
+                summary += self.format_forecast_item("PM2.5", item)
+        if forecast.pm10 is not None:
+            item = next((i for i in forecast.pm10 if i.day == today), None)
+            if item is not None and item.avg is not None:
+                summary += self.format_forecast_item("PM10", item)
+        return summary

@@ -145,6 +145,42 @@ class TestInit:
 
 
 # ---------------------------------------------------------------------------
+# AQI description / emoji helpers
+# ---------------------------------------------------------------------------
+
+class TestAqiDescription:
+    @pytest.mark.parametrize("aqi,expected", [
+        (0,   "Good"),
+        (50,  "Good"),
+        (51,  "Moderate"),
+        (100, "Moderate"),
+        (101, "Unhealthy for Sensitive Groups"),
+        (150, "Unhealthy for Sensitive Groups"),
+        (151, "Unhealthy"),
+        (200, "Unhealthy"),
+        (201, "Very Unhealthy"),
+        (300, "Very Unhealthy"),
+        (301, "Hazardous"),
+        (500, "Hazardous"),
+    ])
+    def test_description_boundaries(self, service, aqi, expected):
+        assert service.get_aqi_description(aqi) == expected
+
+
+class TestAqiEmoji:
+    @pytest.mark.parametrize("aqi,expected", [
+        (25,  "🟢"),
+        (75,  "🟡"),
+        (125, "🟠"),
+        (175, "🔴"),
+        (250, "🟣"),
+        (400, "🟤"),
+    ])
+    def test_emoji_ranges(self, service, aqi, expected):
+        assert service.get_aqi_emoji(aqi) == expected
+
+
+# ---------------------------------------------------------------------------
 # Happy-path tests
 # ---------------------------------------------------------------------------
 
@@ -291,5 +327,148 @@ class TestRequestConstruction:
         monkeypatch.setattr("services.aqicn_service.requests.get", fake_get)
         service.get_air_quality(42.7375, -84.5361)
 
-        assert captured["url"] == "https://api.waqi.info/feed/geo:@42.7375;-84.5361"
+        assert captured["url"] == "https://api.waqi.info/feed/geo:42.7375;-84.5361"
         assert captured["params"] == {"token": "test-key-123"}
+
+
+# ---------------------------------------------------------------------------
+# AQI level helper
+# ---------------------------------------------------------------------------
+
+class TestAqiLevel:
+    @pytest.mark.parametrize("aqi,expected", [
+        (0,   0),
+        (50,  0),
+        (51,  1),
+        (100, 1),
+        (101, 2),
+        (150, 2),
+        (151, 3),
+        (200, 3),
+        (201, 4),
+        (300, 4),
+        (301, 5),
+        (500, 5),
+    ])
+    def test_level_boundaries(self, service, aqi, expected):
+        assert service.get_aqi_level(aqi) == expected
+
+
+# ---------------------------------------------------------------------------
+# format_forecast_item
+# ---------------------------------------------------------------------------
+
+class TestFormatForecastItem:
+    def test_full_item(self, service):
+        from models.air_quality import AirQualityForecastItemData
+        item = AirQualityForecastItemData(avg=42, day="2026-04-05", min=10, max=80)
+        result = service.format_forecast_item("PM2.5", item)
+        assert "PM2.5" in result
+        assert "42" in result
+        assert "min 10" in result
+        assert "max 80" in result
+        assert result.endswith("\n")
+
+    def test_item_without_min_max(self, service):
+        from models.air_quality import AirQualityForecastItemData
+        item = AirQualityForecastItemData(avg=75, day="2026-04-05", min=None, max=None)
+        result = service.format_forecast_item("PM10", item)
+        assert "PM10" in result
+        assert "75" in result
+        assert "min" not in result
+        assert "max" not in result
+
+    def test_item_with_none_avg(self, service):
+        from models.air_quality import AirQualityForecastItemData
+        item = AirQualityForecastItemData(avg=None, day="2026-04-05", min=5, max=20)
+        result = service.format_forecast_item("PM2.5", item)
+        assert "PM2.5" in result
+        # No description/emoji when avg is None
+        assert result.endswith("\n")
+
+    def test_description_and_emoji_derived_from_avg(self, service):
+        from models.air_quality import AirQualityForecastItemData
+        item = AirQualityForecastItemData(avg=25, day="2026-04-05", min=None, max=None)
+        result = service.format_forecast_item("PM2.5", item)
+        assert "Good" in result
+        assert "🟢" in result
+
+
+# ---------------------------------------------------------------------------
+# get_todays_forecast_summary
+# ---------------------------------------------------------------------------
+
+class TestGetTodaysForecastSummary:
+    def test_returns_todays_pm25_and_pm10(self, service, monkeypatch):
+        from zoneinfo import ZoneInfo
+        from models.air_quality import AirQualityDailyForecastData, AirQualityForecastItemData
+        today = "2026-04-05"
+        monkeypatch.setattr(
+            "services.aqicn_service.datetime",
+            type("dt", (), {"now": staticmethod(
+                lambda tz=None: type("d", (), {"strftime": lambda self, fmt: today})()
+            )})
+        )
+        daily = AirQualityDailyForecastData(
+            pm25=[AirQualityForecastItemData(avg=35, day=today, max=50, min=10)],
+            pm10=[AirQualityForecastItemData(avg=12, day=today, max=20, min=5)],
+            uvi=[],
+        )
+        summary = service.get_todays_forecast_summary(ZoneInfo("America/Detroit"), daily)
+        assert "PM2.5" in summary
+        assert "35" in summary
+        assert "PM10" in summary
+        assert "12" in summary
+
+    def test_no_matching_date_returns_empty(self, service, monkeypatch):
+        from zoneinfo import ZoneInfo
+        from models.air_quality import AirQualityDailyForecastData, AirQualityForecastItemData
+        monkeypatch.setattr(
+            "services.aqicn_service.datetime",
+            type("dt", (), {"now": staticmethod(
+                lambda tz=None: type("d", (), {"strftime": lambda self, fmt: "2026-04-05"})()
+            )})
+        )
+        daily = AirQualityDailyForecastData(
+            pm25=[AirQualityForecastItemData(avg=35, day="2026-01-01", max=50, min=10)],
+            pm10=[AirQualityForecastItemData(avg=12, day="2026-01-01", max=20, min=5)],
+            uvi=[],
+        )
+        summary = service.get_todays_forecast_summary(ZoneInfo("America/Detroit"), daily)
+        assert summary == ""
+
+    def test_none_pm25_skipped(self, service, monkeypatch):
+        from zoneinfo import ZoneInfo
+        from models.air_quality import AirQualityDailyForecastData, AirQualityForecastItemData
+        today = "2026-04-05"
+        monkeypatch.setattr(
+            "services.aqicn_service.datetime",
+            type("dt", (), {"now": staticmethod(
+                lambda tz=None: type("d", (), {"strftime": lambda self, fmt: today})()
+            )})
+        )
+        daily = AirQualityDailyForecastData(
+            pm25=None,
+            pm10=[AirQualityForecastItemData(avg=8, day=today, max=15, min=3)],
+            uvi=[],
+        )
+        summary = service.get_todays_forecast_summary(ZoneInfo("America/Detroit"), daily)
+        assert "PM2.5" not in summary
+        assert "PM10" in summary
+
+    def test_none_timezone_falls_back(self, service, monkeypatch):
+        from models.air_quality import AirQualityDailyForecastData, AirQualityForecastItemData
+        today = "2026-04-05"
+        monkeypatch.setattr(
+            "services.aqicn_service.datetime",
+            type("dt", (), {"now": staticmethod(
+                lambda tz=None: type("d", (), {"strftime": lambda self, fmt: today})()
+            )})
+        )
+        daily = AirQualityDailyForecastData(
+            pm25=[AirQualityForecastItemData(avg=20, day=today, max=30, min=5)],
+            pm10=[],
+            uvi=[],
+        )
+        summary = service.get_todays_forecast_summary(None, daily)
+        assert "PM2.5" in summary

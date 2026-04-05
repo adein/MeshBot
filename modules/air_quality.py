@@ -5,7 +5,7 @@ from timezonefinder import TimezoneFinder
 from interfaces.bot_module import BotModule
 from models.command import CommandData
 from models.location import GpsLocation
-from models.air_quality import AirQualityData, AirQualityDailyForecastData, AirQualityCurrentMeasurementData, AirQualityCityData, AirQualityTimeData
+from models.air_quality import AirQualityDailyForecastData, AirQualityForecastItemData
 from services.aqicn_service import AirQualityService
 from services.positionstack_geocode_service import PositionstackGeocodeService
 
@@ -77,14 +77,14 @@ class AirQuality(BotModule):
         else:
             summary += ":"
         if air_quality.aqi is not None:
-            description = self._get_aqi_description(air_quality.aqi)
-            emoji = self._get_aqi_emoji(air_quality.aqi)
+            description = self.api_service.get_aqi_description(air_quality.aqi)
+            emoji = self.api_service.get_aqi_emoji(air_quality.aqi)
             summary += f" {description} {air_quality.aqi} {emoji}\n"
         else:
             summary += " Unknown\n"
         if air_quality.forecast is not None and air_quality.forecast.daily is not None:
-            forecast_summary = self._get_todays_forecast_summary(
-                air_quality.forecast.daily)
+            forecast_summary = self.api_service.get_todays_forecast_summary(
+                self.local_tz, air_quality.forecast.daily)
             if len(forecast_summary) > 0:
                 summary += forecast_summary
         if len(summary) <= 0:
@@ -97,53 +97,3 @@ class AirQuality(BotModule):
         tf = TimezoneFinder()
         time_zone = tf.timezone_at(lat=latitude, lng=longitude)
         return time_zone
-
-    def _get_aqi_description(self, aqi: int) -> str | None:
-        if aqi <= 50:
-            return "Good"
-        elif aqi <= 100:
-            return "Moderate"
-        elif aqi <= 150:
-            return "Unhealthy for Sensitive Groups"
-        elif aqi <= 200:
-            return "Unhealthy"
-        elif aqi <= 300:
-            return "Very Unhealthy"
-        else:
-            return "Hazardous"
-
-    def _get_aqi_emoji(self, aqi: int) -> str | None:
-        if aqi <= 50:
-            return "🟢"
-        elif aqi <= 100:
-            return "🟡"
-        elif aqi <= 150:
-            return "🟠"
-        elif aqi <= 200:
-            return "🔴"
-        elif aqi <= 300:
-            return "🟣"
-        else:
-            return "🟤"
-
-    def _format_forecast_item(self, label: str, item) -> str:
-        description = self._get_aqi_description(item.avg)
-        emoji = self._get_aqi_emoji(item.avg)
-        result = f"{label}: {description} {item.avg} {emoji}"
-        if item.min is not None and item.max is not None:
-            result += f" (min {item.min}, max {item.max})"
-        return result + "\n"
-
-    def _get_todays_forecast_summary(self, forecast: AirQualityDailyForecastData) -> str:
-        today = datetime.now(self.local_tz).strftime(
-            "%Y-%m-%d") if self.local_tz else datetime.now().strftime("%Y-%m-%d")
-        summary = ""
-        if forecast.pm25 is not None:
-            item = next((i for i in forecast.pm25 if i.day == today), None)
-            if item is not None and item.avg is not None:
-                summary += self._format_forecast_item("PM2.5", item)
-        if forecast.pm10 is not None:
-            item = next((i for i in forecast.pm10 if i.day == today), None)
-            if item is not None and item.avg is not None:
-                summary += self._format_forecast_item("PM10", item)
-        return summary
