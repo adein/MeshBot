@@ -42,7 +42,7 @@ class AirQualityService:
         """
         self.logger.debug(
             "Get air quality for latitude: %s, longitude: %s", latitude, longitude)
-        url = f"{BASE_URL}/{LAT_LNG_PATH}@{latitude};{longitude}"
+        url = f"{BASE_URL}/{LAT_LNG_PATH}{latitude};{longitude}"
 
         try:
             params = {
@@ -68,12 +68,16 @@ class AirQualityService:
             forecast = None
             if 'aqi' in data:
                 aqi = data['aqi']
+            else:
+                self.logger.warning("Air quality is missing AQI")
             if 'city' in data:
                 city_data = data['city']
                 city = AirQualityCityData(
                     name=city_data.get('name'),
                     url=city_data.get('url')
                 )
+            else:
+                self.logger.warning("Air quality is missing City information")
             if 'dominentpol' in data:
                 dominentpol = data['dominentpol']
             if 'iaqi' in data:
@@ -91,6 +95,8 @@ class AirQualityService:
                     w=iaqi_data.get('w', {}).get('v'),
                     wg=iaqi_data.get('wg', {}).get('v')
                 )
+            else:
+                self.logger.warning("Air quality is missing current measurement information")
             if 'time' in data:
                 time_data = data['time']
                 time = AirQualityTimeData(
@@ -128,6 +134,8 @@ class AirQualityService:
                     ]
                 )
                 forecast = AirQualityForecastData(daily=daily_forecast)
+            else:
+                self.logger.warning("Air quality is missing forecast information")
             return AirQualityData(
                 aqi=aqi,
                 city=city,

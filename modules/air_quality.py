@@ -79,7 +79,7 @@ class AirQuality(BotModule):
         if air_quality.aqi is not None:
             description = self._get_aqi_description(air_quality.aqi)
             emoji = self._get_aqi_emoji(air_quality.aqi)
-            summary += f" {description} {air_quality.aqi} {emoji}.\n"
+            summary += f" {description} {air_quality.aqi} {emoji}\n"
         else:
             summary += " Unknown\n"
         if air_quality.forecast is not None and air_quality.forecast.daily is not None:
@@ -132,7 +132,7 @@ class AirQuality(BotModule):
         result = f"{label}: {description} {item.avg} {emoji}"
         if item.min is not None and item.max is not None:
             result += f" (min {item.min}, max {item.max})"
-        return result + ".\n"
+        return result + "\n"
 
     def _get_todays_forecast_summary(self, forecast: AirQualityDailyForecastData) -> str:
         today = datetime.now(self.local_tz).strftime(

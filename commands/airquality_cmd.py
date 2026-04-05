@@ -5,5 +5,5 @@ class AirQualityCommand(BotCommand):
     """
     Command that provides air quality information for a given location.
     """
-    trigger = "airquality"
+    trigger = "aqi"
     event_topic = "bot.command.air_quality"

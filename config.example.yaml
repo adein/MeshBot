@@ -25,7 +25,7 @@ modules:
     interval_seconds: 0
     contact_email: "public_contact_email@youremail.com"
     contact_node_id: "!your_node_id_for_contact"
-  aqi:
+  air_quality:
     enabled: true
     dm_only: true
     interval_seconds: 0
