@@ -1,19 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
-
-
-@dataclass
-class AirQualityData:
-    """
-    Data class to hold air quality information.
-    """
-    __slots__ = ['aqi', 'city', 'dominentpol', 'iaqi', 'time', 'forecast']
-    aqi: int | None
-    city: AirQualityCityData | None
-    dominentpol: str | None
-    iaqi: AirQualityCurrentMeasurementData | None
-    time: AirQualityTimeData | None
-    forecast: AirQualityForecastData | None
 
 
 @dataclass
@@ -59,12 +44,15 @@ class AirQualityTimeData:
 
 
 @dataclass
-class AirQualityForecastData:
+class AirQualityForecastItemData:
     """
-    Data class to hold air quality forecast information.
+    Data class to hold air quality forecast item information.
     """
-    __slots__ = ['daily']
-    daily: AirQualityDailyForecastData | None
+    __slots__ = ['avg', 'day', 'max', 'min']
+    avg: int | None
+    day: str | None
+    max: int | None
+    min: int | None
 
 
 @dataclass
@@ -79,12 +67,23 @@ class AirQualityDailyForecastData:
 
 
 @dataclass
-class AirQualityForecastItemData:
+class AirQualityForecastData:
     """
-    Data class to hold air quality forecast item information.
+    Data class to hold air quality forecast information.
     """
-    __slots__ = ['avg', 'day', 'max', 'min']
-    avg: int | None
-    day: str | None
-    max: int | None
-    min: int | None
+    __slots__ = ['daily']
+    daily: AirQualityDailyForecastData | None
+
+
+@dataclass
+class AirQualityData:
+    """
+    Data class to hold air quality information.
+    """
+    __slots__ = ['aqi', 'city', 'dominentpol', 'iaqi', 'time', 'forecast']
+    aqi: int | None
+    city: AirQualityCityData | None
+    dominentpol: str | None
+    iaqi: AirQualityCurrentMeasurementData | None
+    time: AirQualityTimeData | None
+    forecast: AirQualityForecastData | None
